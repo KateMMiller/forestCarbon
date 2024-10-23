@@ -410,7 +410,7 @@ tree_final <- treecond |> select(plt_cn = Plot_Name, tree_cn = tree_id, year = S
                                  spcd = SPCD, JENKINS_SPGRPCD, statuscd = STATUSCD, statusclassifier = STATUSclassifier,
                                  ccld = CrownClassCode, dbhcm = DBHcm, ht, htcd, cull, habit, decaycd)
 
-write.csv(tree_final, "./data/tree_final.csv")
+write.csv(tree_final, "./data/NETN_tree_data_WIP.csv")
 
 head(tree_final)
 #  Next Steps
