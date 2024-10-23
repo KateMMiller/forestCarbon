@@ -33,9 +33,10 @@ ecosub <- read_sf("./data/S_USA.EcomapSubsections.shp")
 # st_crs(ecosub) #EPSG 4269 NAD83 latlong
 
 #---- Spatial join NETN plots to Ecological Province and Subsection ----
-plots <- joinLocEvent(output = 'verbose') |> select(Plot_Name, ParkUnit, Lat, Long) |>
+plots <- joinLocEvent(output = 'verbose')
+plots1 <- plots |> select(Plot_Name, ParkUnit, Lat, Long) |>
   mutate(lat = Lat, long = Long) |> unique()
-plots_sf <- st_as_sf(plots, coords = c("Long", "Lat"), crs = 4269)
+plots_sf <- st_as_sf(plots1, coords = c("Long", "Lat"), crs = 4269)
 sf_use_s2(FALSE) # troubleshooting st_join
 
 # Province
@@ -76,18 +77,33 @@ table(plots_eco$SUBSECTION, plots_eco$ParkUnit) # No more 816 (water)
 plots_eco <- left_join(plots_ecoprov |> select(-MAP_UNIT_N, -MAP_UNIT_S),
                        plots_ecosub |> select(-MAP_UNIT_N, -MAP_UNIT_S),
                        by = c("Plot_Name", "ParkUnit", "lat", "long")) |>
-  select(Plot_Name, ParkUnit, PROV = PROVINCE, SUBS = SUBSECTION, lat, long)
-
-head(plots_eco)
-length(unique(plots_eco$Plot_Name)) #351
-table(complete.cases(plots_eco)) # all TRUE
+  select(Plot_Name, ecodivision = PROVINCE, ecosubcd = SUBSECTION)
 
 #---- State, county and FIPS Codes ----
-head(plot_eco)
-us_states <- geoboundaries("USA", "adm1")
-us_county <- geoboundaries("USA", "adm2")
+us_states <- st_transform(geoboundaries("USA", "adm1"), 4269)
+us_county <- st_transform(geoboundaries("USA", "adm2"), 4269)
+plots_state <- st_join(plots_sf, us_states, left = T) |> select(Plot_Name, state_name = shapeName) |>
+  st_drop_geometry()
+plots_county <- st_join(plots_sf, us_county, left = T) |>
+  mutate(county = paste0(shapeName, " County")) |>
+  select(Plot_Name, ParkUnit, county) |>
+  st_drop_geometry()
 
+plots_comb <- left_join(plots_state, plots_county, by = c("Plot_Name"))
 data("fips_codes")
+plots_comb2 <- left_join(plots_comb, fips_codes, by = c("state_name", "county"))
+head(plots_comb2)
+
+plots2 <- left_join(
+  plots |> select(Plot_Name, Network, ParkUnit, ParkSubUnit, Lat, Long, IsStuntedWoodland) |> unique(),
+  plots_eco, by = "Plot_Name"
+)
+
+plots_final <- left_join(plots2, plots_comb2, by = c("Plot_Name", "ParkUnit")) |>
+  select(plt_cn = Plot_Name, state_name, ecosubcd, lat = Lat, long = Long, ecodivision, statecd = state_code,
+         unitcd = ParkSubUnit, countycd = county_code)
+
+head(plots_final)
 
 #---- Compile NETN tree data ----
 trees <- joinTreeData(park = "all", from = 2006, to = 2024, status = 'active') |>
