@@ -229,8 +229,7 @@ trht_avg <- joinStandData() |> select(Plot_Name, SampleYear, Avg_Height_Codom, A
 
 # Estimating tree heights from NETN Ecological Integrity SOP, page 158
 treehts <- left_join(trees5, trht_avg, by = c("Plot_Name", "SampleYear")) |>
-  mutate(htcd = ifelse(htcd == 1, 1, 4), # 4 = estimated with a model in FIA db
-         ht =
+  mutate(ht =
            case_when(!is.na(HEIGHT_IND) ~ HEIGHT_IND,
                      CrownClassCode == 1 ~ Avg_Height_Codom, # could be taller, but typically codom
                      CrownClassCode == 2 ~ Avg_Height_Codom * 1.1,
@@ -240,7 +239,7 @@ treehts <- left_join(trees5, trht_avg, by = c("Plot_Name", "SampleYear")) |>
                      CrownClassCode %in% c(5, 6) ~ Avg_Height_Codom * 0.5 # subcanopy and gap exploiters
                      )) |>
   select(tree_id, Plot_Name, Network, ParkUnit, ParkSubUnit, SampleYear, cycle, SCIENTIFIC_NAME, usda_symbol = TaxonCode,
-         SPCD, JENKINS_SPGRPCD, STATUSCD, STATUSclassifier, CrownClassCode, DBHcm, ht, htcd)
+         SPCD, JENKINS_SPGRPCD, STATUSCD, STATUSclassifier, CrownClassCode, DBHcm, ht, htcd, decaycd = DecayClassCode)
 
 #----- Tricky heights to fix manually -----
 # ACAD-001 2006 has no tree heights. Using 2010 measurements
@@ -402,19 +401,21 @@ treecond <- left_join(treehts, treecond1, by = c("tree_id", "SampleYear")) |>
          CULL_DBT = ifelse(AD == 0 & DBT == 1, 0.1, 0),
          cull = CULL_br + CULL_AD + CULL_CAVL + CULL_CAVS + CULL_DBT,
          habit = "Tree",
-         tpa_unadj = ifelse(ParkUnit == "ACAD", (225/4046.86)^-1, (400/4046.86)^-1)
-  )
+         tpa_unadj = ifelse(ParkUnit == "ACAD", (225/4046.86)^-1, (400/4046.86)^-1))
 
-head(treecond)
+treecond$htcd[is.na(treecond$htcd) & !is.na(treecond$ht)] <- 4
 
 tree_final <- treecond |> select(plt_cn = Plot_Name, tree_cn = tree_id, year = SampleYear, cycle,
                                  tpa_unadj, scientific_name = SCIENTIFIC_NAME, usda_symbol,
-                                 spcd = SPCD, JENKINS_SPGRPCD, STATUSCD, STATUSclassifier,
-                                 ccld = CrownClassCode, DBH = DBHcm, ht, htcd, cull, habit)
-#++++ ENDED HERE +++++
+                                 spcd = SPCD, JENKINS_SPGRPCD, statuscd = STATUSCD, statusclassifier = STATUSclassifier,
+                                 ccld = CrownClassCode, dbhcm = DBHcm, ht, htcd, cull, habit, decaycd)
+
+write.csv(tree_final, "./data/tree_final.csv")
+
 head(tree_final)
 #  Next Steps
-    # Add saplings
-  # Events
+  # Add saplings
+  # Compile Events
+  # Metadata defining each column
 
 
