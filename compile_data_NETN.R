@@ -73,9 +73,9 @@ plots_ecosub$MAP_UNIT_S[plots_ecosub$ParkUnit == "ACAD"] <- "211Cb"
 plots_ecosub$MAP_UNIT_N[plots_ecosub$ParkUnit == "ACAD"] <- "Maine Eastern Coastal"
 plots_ecosub$SUBSECTION[plots_ecosub$ParkUnit == "ACAD"] <- 322
 
-table(plots_eco$MAP_UNIT_N, plots_eco$ParkUnit) # No more Water
-table(plots_eco$MAP_UNIT_S, plots_eco$ParkUnit) # No more Water
-table(plots_eco$SUBSECTION, plots_eco$ParkUnit) # No more 816 (water)
+table(plots_ecosub$MAP_UNIT_N, plots_ecosub$ParkUnit) # No more Water
+table(plots_ecosub$MAP_UNIT_S, plots_ecosub$ParkUnit) # No more Water
+table(plots_ecosub$SUBSECTION, plots_ecosub$ParkUnit) # No more 816 (water)
 
 # Join with eco prov/sub codes
 plots_eco <- left_join(plots_ecoprov |> select(-MAP_UNIT_N, -MAP_UNIT_S),
@@ -104,7 +104,8 @@ plots2 <- left_join(
 )
 
 plots_final <- left_join(plots2, plots_comb2, by = c("Plot_Name", "ParkUnit")) |>
-  select(plt_cn = Plot_Name, state_name, ecosubcd, lat = Lat, long = Long, ecodivision, statecd = state_code,
+  select(plt_cn = Plot_Name, park = ParkUnit, parksubunit = ParkSubUnit,  network = Network,
+         state_name, ecosubcd, lat = Lat, long = Long, ecodivision, statecd = state_code,
          unitcd = ParkSubUnit, countycd = county_code)
 
 head(plots_final)
@@ -407,14 +408,20 @@ treecond$htcd[is.na(treecond$htcd) & !is.na(treecond$ht)] <- 4
 
 tree_final <- treecond |> select(plt_cn = Plot_Name, tre_cn = tree_id, year = SampleYear, cycle,
                                  tpa_unadj, scientific_name = SCIENTIFIC_NAME, usda_symbol,
-                                 spcd = SPCD, JENKINS_SPGRPCD, statuscd = STATUSCD, statusclassifier = STATUSclassifier,
-                                 ccld = CrownClassCode, dbhcm = DBHcm, ht, htcd, cull, habit, decaycd)
-head(plots_final)
+                                 spcd = SPCD, jenkins_spgrpcd = JENKINS_SPGRPCD, statuscd = STATUSCD,
+                                 statusclassifier = STATUSclassifier,
+                                 treeclcd = CrownClassCode, dbhcm = DBHcm, ht, htcd, cull, habit, decaycd)
 
-tree_plots <- left_join(plots_final, tree_final, by = c("plt_cn"))
+tree_plots <- left_join(plots_final, tree_final, by = c("plt_cn")) |>
+  select(plt_cn,  tre_cn, ecosubcd, ecodivision, year, cycle, tpa_unadj,
+         lat, long, network, park, parksubunit, state_name, statecd, countycd,
+         spcd, jenkins_spgrpcd, scientific_name, usda_symbol,
+         statuscd, statusclassifier, treeclcd,
+         dbhcm, ht, htcd, cull, habit, decaycd)
 head(tree_plots)
+names(tree_plots)
 
-write.csv(tree_plots, "./data/NETN_tree_data_WIP.csv")
+write.csv(tree_plots, "./data/NETN_tree_data_WIP.csv", row.names = F)
 #  Next Steps
   # Add saplings
   # Compile Events
