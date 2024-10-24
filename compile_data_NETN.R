@@ -405,7 +405,7 @@ treecond <- left_join(treehts, treecond1, by = c("tree_id", "SampleYear")) |>
 
 treecond$htcd[is.na(treecond$htcd) & !is.na(treecond$ht)] <- 4
 
-tree_final <- treecond |> select(plt_cn = Plot_Name, tree_cn = tree_id, year = SampleYear, cycle,
+tree_final <- treecond |> select(plt_cn = Plot_Name, tre_cn = tree_id, year = SampleYear, cycle,
                                  tpa_unadj, scientific_name = SCIENTIFIC_NAME, usda_symbol,
                                  spcd = SPCD, JENKINS_SPGRPCD, statuscd = STATUSCD, statusclassifier = STATUSclassifier,
                                  ccld = CrownClassCode, dbhcm = DBHcm, ht, htcd, cull, habit, decaycd)
