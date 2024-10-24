@@ -409,10 +409,12 @@ tree_final <- treecond |> select(plt_cn = Plot_Name, tree_cn = tree_id, year = S
                                  tpa_unadj, scientific_name = SCIENTIFIC_NAME, usda_symbol,
                                  spcd = SPCD, JENKINS_SPGRPCD, statuscd = STATUSCD, statusclassifier = STATUSclassifier,
                                  ccld = CrownClassCode, dbhcm = DBHcm, ht, htcd, cull, habit, decaycd)
+head(plots_final)
 
-write.csv(tree_final, "./data/NETN_tree_data_WIP.csv")
+tree_plots <- left_join(plots_final, tree_final, by = c("plt_cn"))
+head(tree_plots)
 
-head(tree_final)
+write.csv(tree_plots, "./data/NETN_tree_data_WIP.csv")
 #  Next Steps
   # Add saplings
   # Compile Events
