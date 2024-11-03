@@ -16,7 +16,7 @@ importCSV(path = "./data", zip_name = "NETN_forest_data_package_20240926.zip")
 #---- Download and compile external data -----
 # Download FIA REF_SPECIES.csv to get SPCD
 ref_url <- "https://apps.fs.usda.gov/fia/datamart/CSV/FIADB_REFERENCE.zip"
-download.file(refurl, "./data/FIADB_REFERENCE.zip")
+download.file(re_furl, "./data/FIADB_REFERENCE.zip")
 refspp <- read.csv(unzip("./data/FIADB_REFERENCE.zip", "REF_SPECIES.csv")) |>
   select(SPCD, SPECIES_SYMBOL, SCIENTIFIC_NAME, GENUS, SPECIES, JENKINS_SPGRPCD)
 file.remove("REF_SPECIES.csv")
