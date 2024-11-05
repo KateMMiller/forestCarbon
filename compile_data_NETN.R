@@ -403,7 +403,7 @@ meta$description[meta$column_name == "habit"] <- "Denotes if stem is a tree or s
 meta$NETN[meta$column_name == "habit"] <- "Individual saplings are not tracked over time, and sometimes are missed across years because crews because QA/QC isn't as strict as with trees."
 
 meta$description[meta$column_name == "decaycd"] <- "FIA decay class for snags ranging from 1-5."
-
+write.csv(meta, "./data/metadata_NETN.csv", row.names = F)
 
 #++++ Questions for group ++++
 # 1.  Photinia villosa doesn't have a SPCD. The closest match is Photinia x fraseri or Photinia davidiana. Do I use
