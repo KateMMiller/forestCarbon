@@ -106,7 +106,7 @@ plots2 <- left_join(
 plots_final <- left_join(plots2, plots_comb2, by = c("Plot_Name", "ParkUnit")) |>
   select(plt_cn = Plot_Name, park = ParkUnit, parksubunit = ParkSubUnit,  network = Network,
          state_name, ecosubcd, lat = Lat, long = Long, ecodivision, statecd = state_code,
-         unitcd = ParkSubUnit, countycd = county_code)
+         countycd = county_code)
 
 head(plots_final)
 # This is the left df to join tree and sapling data to.
@@ -120,6 +120,16 @@ trees <- joinTreeData(park = "all", from = 2006, to = 2024, status = 'active') |
 # Drop 4 stunted woodlands, which are sampled at DRC and typically <5m tall.
 stunted <- joinLocEvent() |> filter(IsStuntedWoodland == TRUE) |>
   select(Plot_Name) |> unique()
+
+# Fix unk tree where hardwood or conifer is known (legacy of old database)
+trees$ScientificName[trees$TSN == -9999999939] <- "Unknown Hardwood"
+trees$TSN[trees$TSN == -9999999939] <- -9999999944
+
+trees$ScientificName[trees$TSN == -9999999938] <- "Unknown Conifer"
+trees$TSN[trees$TSN == -9999999938] <- -9999999943
+
+trees$ScientificName[trees$TSN == -9999999937] <- "Unknown species"
+trees$TSN[trees$TSN == -9999999937] <- -9999999950
 
 # Join USDA Plants Symbol and drop stunted woodland plots
 taxa <- VIEWS_NETN$Taxa_NETN[,c("TSN", "TaxonCode")]
@@ -139,58 +149,10 @@ trees2$TaxonCode[trees2$ScientificName == "Quercus montana"] <- "QUPR2"
 
 # Join REF_SPECIES SPCD and JENKINS_SPGRPCD to tree data
 trees3 <- left_join(trees2, refspp, by = c("TaxonCode" = "SPECIES_SYMBOL"))
+trspp_na <- trees3 |> filter(is.na(SPCD)) |> select(ScientificName) |> unique()
 
 #----- Fix missing tree status and crown class codes -----
-# For live trees missing a crown class or status qualifier, using the class from the next consecutive measurement
-trees3$CrownClassCode[trees3$tree_id == "ACAD-002-010" & trees3$SampleYear == 2006] <- 4
-trees3$CrownClassCode[trees3$tree_id == "ACAD-008-014" & trees3$SampleYear == 2010] <- 5
-trees3$CrownClassCode[trees3$tree_id == "ACAD-022-007" & trees3$SampleYear == 2006] <- 5
-trees3$TreeStatusCode[trees3$tree_id == "ACAD-031-029" & trees3$SampleYear == 2010] <- "DM"
-trees3$CrownClassCode[trees3$tree_id == "ACAD-046-010" & trees3$SampleYear == 2007] <- 4
-trees3$TreeStatusCode[trees3$tree_id == "ACAD-046-010" & trees3$SampleYear == 2007] <- "AS"
-trees3$CrownClassCode[trees3$tree_id == "ACAD-046-010" & trees3$SampleYear == 2011] <- 4
-trees3$TreeStatusCode[trees3$tree_id == "ACAD-046-010" & trees3$SampleYear == 2011] <- "AS"
-trees3$CrownClassCode[trees3$tree_id == "ACAD-046-016" & trees3$SampleYear == 2011] <- 5
-trees3$TreeStatusCode[trees3$tree_id == "ACAD-046-016" & trees3$SampleYear == 2011] <- "AS"
-trees3$CrownClassCode[trees3$tree_id == "ACAD-064-002" & trees3$SampleYear == 2011] <- 1
-trees3$TreeStatusCode[trees3$tree_id == "ACAD-064-002" & trees3$SampleYear == 2011] <- "AS"
-trees3$CrownClassCode[trees3$tree_id == "ACAD-066-010" & trees3$SampleYear == 2011] <- 1
-trees3$TreeStatusCode[trees3$tree_id == "ACAD-066-010" & trees3$SampleYear == 2011] <- "AS"
-trees3$CrownClassCode[trees3$tree_id == "ACAD-075-017" & trees3$SampleYear == 2007] <- 5
-trees3$CrownClassCode[trees3$tree_id == "ACAD-079-018" & trees3$SampleYear == 2011] <- 5
-trees3$CrownClassCode[trees3$tree_id == "ACAD-086-002" & trees3$SampleYear == 2008] <- 3
-trees3$CrownClassCode[trees3$tree_id == "ACAD-102-026" & trees3$SampleYear == 2008] <- 3
-trees3$CrownClassCode[trees3$tree_id == "ACAD-109-001" & trees3$SampleYear == 2008] <- 5
-trees3$CrownClassCode[trees3$tree_id == "ACAD-161-026" & trees3$SampleYear == 2009] <- 5
-trees3$CrownClassCode[trees3$tree_id == "ACAD-176-033" & trees3$SampleYear == 2011] <- 5
-
-trees3$CrownClassCode[trees3$tree_id == "MABI-011-007" & trees3$SampleYear == 2010] <- 3
-trees3$CrownClassCode[trees3$tree_id == "MABI-018-001" & trees3$SampleYear == 2008] <- 5
-
-trees3$CrownClassCode[trees3$tree_id == "MIMA-001-006" & trees3$SampleYear == 2006] <- 1
-trees3$CrownClassCode[trees3$tree_id == "MIMA-001-006" & trees3$SampleYear == 2010] <- 1
-
-trees3$CrownClassCode[trees3$tree_id == "MORR-010-013" & trees3$SampleYear == 2007] <- 5
-
-trees3$CrownClassCode[trees3$tree_id == "ROVA-029-011" & trees3$SampleYear == 2013] <- 5
-
-trees3$CrownClassCode[trees3$tree_id == "SAGA-011-021" & trees3$SampleYear == 2012] <- 5
-trees3$CrownClassCode[trees3$tree_id == "SAGA-020-013" & trees3$SampleYear == 2012] <- 5
-
-trees3$CrownClassCode[trees3$tree_id == "SARA-002-009" & trees3$SampleYear == 2010] <- 5
-trees3$CrownClassCode[trees3$tree_id == "SARA-005-013" & trees3$SampleYear == 2010] <- 5
-trees3$CrownClassCode[trees3$tree_id == "SARA-014-015" & trees3$SampleYear == 2010] <- 5
-
-trees3$CrownClassCode[trees3$tree_id == "WEFA-001-014" & trees3$SampleYear == 2011] <- 5
-
-# Tricky Zombie trees (live > dead > live)
-trees3$CrownClassCode[trees3$tree_id == "ACAD-088-015" & trees3$SampleYear == 2012] <- 2
-trees3$TreeStatusCode[trees3$tree_id == "ACAD-088-015" & trees3$SampleYear == 2012] <- "AS"
-trees3$CrownClassCode[trees3$tree_id == "ACAD-088-015" & trees3$SampleYear == 2016] <- 4
-trees3$TreeStatusCode[trees3$tree_id == "ACAD-088-015" & trees3$SampleYear == 2016] <- "AB"
-trees3$CrownClassCode[trees3$tree_id == "ACAD-088-015" & trees3$SampleYear == 2021] <- 4
-trees3$TreeStatusCode[trees3$tree_id == "ACAD-088-015" & trees3$SampleYear == 2021] <- "AB"
-
+source("compile_data_NETN_fix_missing_crownclasses.R")
 #----- Status -----
 # Drop Dead Fallen and Dead Cut trees and set up status codes
 live <- c("1", "AB", "AF", "AL", "AM", "AS", "RB", "RF", "RL", "RS")
@@ -205,8 +167,6 @@ trees4 <- trees3 |> filter(TreeStatusCode %in% c(live, dead)) |>
                                       STATUS2 == "S" ~ "standing",
                                       STATUS2 == "M" ~ "missed",
                                       TRUE ~ "unknown"))
-
-table(trees3$STATUSclassifier, useNA = 'always')
 
 #---- Compile tree height ----
   # Joining individual tree heights first for heights with tags.
@@ -239,151 +199,21 @@ treehts <- left_join(trees5, trht_avg, by = c("Plot_Name", "SampleYear")) |>
                      CrownClassCode == 4 & is.na(HEIGHT_IND) & is.na(Avg_Height_Inter) ~ Avg_Height_Codom * 0.8,
                      CrownClassCode %in% c(5, 6) ~ Avg_Height_Codom * 0.5 # subcanopy and gap exploiters
                      )) |>
-  select(tree_id, Plot_Name, Network, ParkUnit, ParkSubUnit, SampleYear, cycle, SCIENTIFIC_NAME, usda_symbol = TaxonCode,
+  select(tree_id, Plot_Name, Network, ParkUnit, ParkSubUnit, SampleYear, cycle, ScientificName, usda_symbol = TaxonCode,
          SPCD, JENKINS_SPGRPCD, STATUSCD, STATUSclassifier, CrownClassCode, DBHcm, ht, htcd, decaycd = DecayClassCode)
 
 #----- Tricky heights to fix manually -----
-# ACAD-001 2006 has no tree heights. Using 2010 measurements
-treehts$ht[treehts$Plot_Name == "ACAD-001" & treehts$SampleYear == 2006 & treehts$CrownClassCode == 2] <- 15.46667 * 1.1
-treehts$ht[treehts$Plot_Name == "ACAD-001" & treehts$SampleYear == 2006 & treehts$CrownClassCode == 3] <- 15.46667
-treehts$ht[treehts$Plot_Name == "ACAD-001" & treehts$SampleYear == 2006 & treehts$CrownClassCode == 4] <- 15.46667 * 0.8
-
-# ACAD-095 2012 trees all classified as dominant with no tree heights. Better to class as codom. Using 2016 measurements for same trees
-treehts$ht[treehts$tree_id == "ACAD-095-001" & treehts$SampleYear == 2012] <- 8.0
-treehts$ht[treehts$tree_id == "ACAD-095-002" & treehts$SampleYear == 2012] <- 8.2
-
-# MABI-014 2008 has no stand heights. Using 2012 measurements
-treehts$ht[treehts$Plot_Name == "MABI-014" & treehts$SampleYear == 2008 & treehts$CrownClassCode == 2] <- 36.13333 * 1.1
-treehts$ht[treehts$Plot_Name == "MABI-014" & treehts$SampleYear == 2008 & treehts$CrownClassCode == 3] <- 36.13333
-treehts$ht[treehts$Plot_Name == "MABI-014" & treehts$SampleYear == 2008 & treehts$CrownClassCode == 4] <- 36.13333 * 0.8
-treehts$ht[treehts$Plot_Name == "MABI-014" & treehts$SampleYear == 2008 & treehts$CrownClassCode == 5] <- 36.13333 * 0.5
-
-# MIMA-020 is early successional with no heights for most years except 2008. Using 2008 values for remaining visits
-treehts$ht[treehts$Plot_Name == "MIMA-020" & treehts$SampleYear %in% c(2012, 2016, 2022) & treehts$CrownClassCode == 1] <- 18
-treehts$ht[treehts$Plot_Name == "MIMA-020" & treehts$SampleYear %in% c(2012, 2016, 2022) & treehts$CrownClassCode == 2] <- 18 * 1.1
-treehts$ht[treehts$Plot_Name == "MIMA-020" & treehts$SampleYear %in% c(2012, 2016, 2022) & treehts$CrownClassCode == 3] <- 18
-treehts$ht[treehts$Plot_Name == "MIMA-020" & treehts$SampleYear %in% c(2012, 2016, 2022) & treehts$CrownClassCode == 4] <- 18 * 0.8
-treehts$ht[treehts$Plot_Name == "MIMA-020" & treehts$SampleYear %in% c(2012, 2016, 2022) & treehts$CrownClassCode == 5] <- 18 * 0.5
-treehts$ht[treehts$Plot_Name == "MIMA-020" & treehts$SampleYear %in% c(2012, 2016, 2022) & treehts$CrownClassCode == 6] <- 18 * 0.5
-
-# MORR-002 2024 has no codominant trees with heights. Using 2019 values.
-treehts$ht[treehts$Plot_Name == "MORR-002" & treehts$SampleYear == 2024 & treehts$CrownClassCode == 1] <- 25.9
-treehts$ht[treehts$Plot_Name == "MORR-002" & treehts$SampleYear == 2024 & treehts$CrownClassCode == 2] <- 25.9 * 1.1
-treehts$ht[treehts$Plot_Name == "MORR-002" & treehts$SampleYear == 2024 & treehts$CrownClassCode == 3] <- 25.9
-treehts$ht[treehts$Plot_Name == "MORR-002" & treehts$SampleYear == 2024 & treehts$CrownClassCode == 5] <- 25.9 * 0.5
-treehts$ht[treehts$Plot_Name == "MORR-002" & treehts$SampleYear == 2024 & treehts$CrownClassCode == 6] <- 25.9 * 0.5
-
-# MORR-006 2007 has no tree heights. Using 2011 measurements
-treehts$ht[treehts$Plot_Name == "MORR-006" & treehts$SampleYear == 2007 & treehts$CrownClassCode == 1] <- 28.8333
-treehts$ht[treehts$Plot_Name == "MORR-006" & treehts$SampleYear == 2007 & treehts$CrownClassCode == 2] <- 28.8333 * 1.1
-treehts$ht[treehts$Plot_Name == "MORR-006" & treehts$SampleYear == 2007 & treehts$CrownClassCode == 3] <- 28.8333
-treehts$ht[treehts$Plot_Name == "MORR-006" & treehts$SampleYear == 2007 & treehts$CrownClassCode == 4] <- 28.8333 * 0.8
-treehts$ht[treehts$Plot_Name == "MORR-006" & treehts$SampleYear == 2007 & treehts$CrownClassCode == 5] <- 28.8333 * 0.5
-
-# MORR-012 2007 has no tree heights. Using 2011 measurements
-treehts$ht[treehts$Plot_Name == "MORR-012" & treehts$SampleYear == 2007 & treehts$CrownClassCode == 1] <- 32.0333
-treehts$ht[treehts$Plot_Name == "MORR-012" & treehts$SampleYear == 2007 & treehts$CrownClassCode == 2] <- 32.0333 * 1.1
-treehts$ht[treehts$Plot_Name == "MORR-012" & treehts$SampleYear == 2007 & treehts$CrownClassCode == 3] <- 32.0333
-treehts$ht[treehts$Plot_Name == "MORR-012" & treehts$SampleYear == 2007 & treehts$CrownClassCode == 4] <- 32.0333 * 0.8
-treehts$ht[treehts$Plot_Name == "MORR-012" & treehts$SampleYear == 2007 & treehts$CrownClassCode == 5] <- 32.0333 * 0.5
-
-# MORR-021 doesn't have codominant trees in 2013, 2017, and 2022. Using 2009 values
-treehts$ht[treehts$Plot_Name == "MORR-021" & treehts$SampleYear %in% c(2013, 2017, 2022) & treehts$CrownClassCode == 1] <- 27.5
-treehts$ht[treehts$Plot_Name == "MORR-021" & treehts$SampleYear %in% c(2013, 2017, 2022) & treehts$CrownClassCode == 2] <- 27.5 * 1.1
-treehts$ht[treehts$Plot_Name == "MORR-021" & treehts$SampleYear %in% c(2013, 2017, 2022) & treehts$CrownClassCode == 3] <- 27.5
-treehts$ht[treehts$Plot_Name == "MORR-021" & treehts$SampleYear %in% c(2013, 2017, 2022) & treehts$CrownClassCode == 5] <- 27.5 * 0.5
-
-# ROVA-001 2007 has no tree heights. Using 2011 measurements
-treehts$ht[treehts$Plot_Name == "ROVA-001" & treehts$SampleYear == 2007 & treehts$CrownClassCode == 1] <- 24.6667
-treehts$ht[treehts$Plot_Name == "ROVA-001" & treehts$SampleYear == 2007 & treehts$CrownClassCode == 2] <- 24.6667 * 1.1
-treehts$ht[treehts$Plot_Name == "ROVA-001" & treehts$SampleYear == 2007 & treehts$CrownClassCode == 3] <- 24.6667
-treehts$ht[treehts$Plot_Name == "ROVA-001" & treehts$SampleYear == 2007 & treehts$CrownClassCode == 4] <- 24.6667 * 0.8
-treehts$ht[treehts$Plot_Name == "ROVA-001" & treehts$SampleYear == 2007 & treehts$CrownClassCode == 5] <- 24.6667 * 0.5
-
-# SARA-002 is early successional with no heights for most years except 2006. Using 2006 values for remaining visits
-treehts$ht[treehts$Plot_Name == "SARA-004" & treehts$SampleYear %in% c(2010, 2014, 2018, 2023) &
-                      treehts$CrownClassCode == 1] <- 7.8
-treehts$ht[treehts$Plot_Name == "SARA-004" & treehts$SampleYear %in% c(2010, 2014, 2018, 2023) &
-                      treehts$CrownClassCode == 2] <- 7.8 * 1.1
-treehts$ht[treehts$Plot_Name == "SARA-004" & treehts$SampleYear %in% c(2010, 2014, 2018, 2023) &
-                      treehts$CrownClassCode == 3] <- 7.8
-treehts$ht[treehts$Plot_Name == "SARA-004" & treehts$SampleYear %in% c(2010, 2014, 2018, 2023) &
-                      treehts$CrownClassCode == 4] <- 7.8 * 0.8
-treehts$ht[treehts$Plot_Name == "SARA-004" & treehts$SampleYear %in% c(2010, 2014, 2018, 2023) &
-                      treehts$CrownClassCode == 5] <- 7.8 * 0.5
-treehts$ht[treehts$Plot_Name == "SARA-004" & treehts$SampleYear %in% c(2010, 2014, 2018, 2023) &
-                      treehts$CrownClassCode == 6] <- 7.8 * 0.5
-
-# SARA-009 is early successional with no heights for most years except 2006. Using 2006 values for remaining visits
-treehts$ht[treehts$Plot_Name == "SARA-009" & treehts$SampleYear %in% c(2010, 2014, 2018, 2023) &
-                      treehts$CrownClassCode == 1] <- 12.7
-treehts$ht[treehts$Plot_Name == "SARA-009" & treehts$SampleYear %in% c(2010, 2014, 2018, 2023) &
-                      treehts$CrownClassCode == 2] <- 12.7 * 1.1
-treehts$ht[treehts$Plot_Name == "SARA-009" & treehts$SampleYear %in% c(2010, 2014, 2018, 2023) &
-                      treehts$CrownClassCode == 3] <- 12.7
-treehts$ht[treehts$Plot_Name == "SARA-009" & treehts$SampleYear %in% c(2010, 2014, 2018, 2023) &
-                      treehts$CrownClassCode == 4] <- 12.7 * 0.8
-treehts$ht[treehts$Plot_Name == "SARA-009" & treehts$SampleYear %in% c(2010, 2014, 2018, 2023) &
-                      treehts$CrownClassCode == 5] <- 12.7 * 0.5
-treehts$ht[treehts$Plot_Name == "SARA-009" & treehts$SampleYear %in% c(2010, 2014, 2018, 2023) &
-                      treehts$CrownClassCode == 6] <- 12.7 * 0.5
-
-# SARA-012 is early successional with no heights for most years except 2006. Using 2006 values for remaining visits
-treehts$ht[treehts$Plot_Name == "SARA-012" & treehts$SampleYear %in% c(2010, 2014, 2018, 2023) &
-                      treehts$CrownClassCode == 1] <- 17.4
-treehts$ht[treehts$Plot_Name == "SARA-012" & treehts$SampleYear %in% c(2010, 2014, 2018, 2023) &
-                      treehts$CrownClassCode == 2] <- 17.4 * 1.1
-treehts$ht[treehts$Plot_Name == "SARA-012" & treehts$SampleYear %in% c(2010, 2014, 2018, 2023) &
-                      treehts$CrownClassCode == 3] <- 17.4
-treehts$ht[treehts$Plot_Name == "SARA-012" & treehts$SampleYear %in% c(2010, 2014, 2018, 2023) &
-                      treehts$CrownClassCode == 4] <- 17.4 * 0.8
-treehts$ht[treehts$Plot_Name == "SARA-012" & treehts$SampleYear %in% c(2010, 2014, 2018, 2023) &
-                      treehts$CrownClassCode == 5] <- 17.4 * 0.5
-treehts$ht[treehts$Plot_Name == "SARA-012" & treehts$SampleYear %in% c(2010, 2014, 2018, 2023) &
-                      treehts$CrownClassCode == 6] <- 17.4 * 0.5
-
-# SARA-024 is early successional with no heights for most years except 2008. Using 2008 values for remaining visits
-treehts$ht[treehts$Plot_Name == "SARA-024" & treehts$SampleYear %in% c(2012, 2016, 2022) &
-                      treehts$CrownClassCode == 1] <- 25
-treehts$ht[treehts$Plot_Name == "SARA-024" & treehts$SampleYear %in% c(2012, 2016, 2022) &
-                      treehts$CrownClassCode == 2] <- 25 * 1.1
-treehts$ht[treehts$Plot_Name == "SARA-024" & treehts$SampleYear %in% c(2012, 2016, 2022) &
-                      treehts$CrownClassCode == 3] <- 25
-treehts$ht[treehts$Plot_Name == "SARA-024" & treehts$SampleYear %in% c(2012, 2016, 2022) &
-                      treehts$CrownClassCode == 4] <- 25 * 0.8
-treehts$ht[treehts$Plot_Name == "SARA-024" & treehts$SampleYear %in% c(2012, 2016, 2022) &
-                      treehts$CrownClassCode == 5] <- 25 * 0.5
-treehts$ht[treehts$Plot_Name == "SARA-024" & treehts$SampleYear %in% c(2012, 2016, 2022) &
-                      treehts$CrownClassCode == 6] <- 25 * 0.5
-
-# SARA-029 has no codominant trees in 2012. Using 2016 values.
-treehts$ht[treehts$Plot_Name == "SARA-029" & treehts$SampleYear == 2012 & treehts$CrownClassCode == 1] <- 18.5
-treehts$ht[treehts$Plot_Name == "SARA-029" & treehts$SampleYear == 2012 & treehts$CrownClassCode == 2] <- 18.5 * 1.1
-treehts$ht[treehts$Plot_Name == "SARA-029" & treehts$SampleYear == 2012 & treehts$CrownClassCode == 3] <- 18.5
-treehts$ht[treehts$Plot_Name == "SARA-029" & treehts$SampleYear == 2012 & treehts$CrownClassCode == 4] <- 13.7
-treehts$ht[treehts$Plot_Name == "SARA-029" & treehts$SampleYear == 2012 & treehts$CrownClassCode == 5] <- 18.5 * 0.5
-treehts$ht[treehts$Plot_Name == "SARA-029" & treehts$SampleYear == 2012 & treehts$CrownClassCode == 6] <- 18.5 * 0.5
-
-# SARA-032 is early successional with no heights for most years except 2006. Using 2006 values for remaining visits
-treehts$ht[treehts$Plot_Name == "SARA-032" & treehts$SampleYear %in% c(2008, 2012, 2016, 2022) &
-                      treehts$CrownClassCode == 1] <- 10.2
-treehts$ht[treehts$Plot_Name == "SARA-032" & treehts$SampleYear %in% c(2008, 2012, 2016, 2022) &
-                      treehts$CrownClassCode == 2] <- 10.2 * 1.1
-treehts$ht[treehts$Plot_Name == "SARA-032" & treehts$SampleYear %in% c(2008, 2012, 2016, 2022) &
-                      treehts$CrownClassCode == 3] <- 10.2
-treehts$ht[treehts$Plot_Name == "SARA-032" & treehts$SampleYear %in% c(2008, 2012, 2016, 2022) &
-                      treehts$CrownClassCode == 4] <- 10.2 * 0.8
-treehts$ht[treehts$Plot_Name == "SARA-032" & treehts$SampleYear %in% c(2008, 2012, 2016, 2022) &
-                      treehts$CrownClassCode == 5] <- 10.2 * 0.5
-treehts$ht[treehts$Plot_Name == "SARA-032" & treehts$SampleYear %in% c(2008, 2012, 2016, 2022) &
-                      treehts$CrownClassCode == 6] <- 10.2 * 0.5
+source("compile_data_NETN_fix_tree_heights.R")
 
 # checking for missing live tree heights
 trhts_na <- treehts |> filter(is.na(ht)) |> filter(STATUSCD == "live") |>
-  select(tree_id, Plot_Name, SampleYear, cycle, SCIENTIFIC_NAME, DBHcm, STATUSCD, STATUSclassifier,
+  select(tree_id, Plot_Name, SampleYear, cycle, ScientificName, DBHcm, STATUSCD, STATUSclassifier,
          CrownClassCode, ht)
 
 table(trhts_na$Plot_Name)
+
+tr_miss_dbh <- treehts |> filter(is.na(DBHcm)) |> filter(SampleYear == "live")
+tr_miss_dbh #none
 
 #----- CULL -----
 treecond1 <- joinTreeConditions() |> mutate(tree_id = paste0(Plot_Name, "-", sprintf("%03d", TagCode))) |>
@@ -406,13 +236,14 @@ treecond <- left_join(treehts, treecond1, by = c("tree_id", "SampleYear")) |>
 
 treecond$htcd[is.na(treecond$htcd) & !is.na(treecond$ht)] <- 4
 
-tree_final <- treecond |> select(plt_cn = Plot_Name, tre_cn = tree_id, year = SampleYear, cycle,
-                                 tpa_unadj, scientific_name = SCIENTIFIC_NAME, usda_symbol,
-                                 spcd = SPCD, jenkins_spgrpcd = JENKINS_SPGRPCD, statuscd = STATUSCD,
-                                 statusclassifier = STATUSclassifier,
-                                 treeclcd = CrownClassCode, dbhcm = DBHcm, ht, htcd, cull, habit, decaycd)
+tree6 <- treecond |> select(plt_cn = Plot_Name, tre_cn = tree_id, year = SampleYear, cycle,
+                            tpa_unadj, scientific_name = ScientificName, usda_symbol,
+                            spcd = SPCD, jenkins_spgrpcd = JENKINS_SPGRPCD, statuscd = STATUSCD,
+                            statusclassifier = STATUSclassifier,
+                            treeclcd = CrownClassCode, dbhcm = DBHcm, ht, htcd, cull, habit, decaycd)
 
-tree_plots <- left_join(plots_final, tree_final, by = c("plt_cn")) |>
+
+tree_plots <- left_join(plots_final, tree6, by = c("plt_cn")) |>
   select(plt_cn,  tre_cn, ecosubcd, ecodivision, year, cycle, tpa_unadj,
          lat, long, network, park, parksubunit, state_name, statecd, countycd,
          spcd, jenkins_spgrpcd, scientific_name, usda_symbol,
@@ -421,10 +252,164 @@ tree_plots <- left_join(plots_final, tree_final, by = c("plt_cn")) |>
 head(tree_plots)
 names(tree_plots)
 
-write.csv(tree_plots, "./data/NETN_tree_data_WIP.csv", row.names = F)
-#  Next Steps
-  # Add saplings
-  # Compile Events
-  # Metadata defining each column
+#write.csv(tree_plots, "./data/NETN_tree_data_WIP.csv", row.names = F)
+
+#---- Compile NETN sapling data ----
+saps <- joinMicroSaplings(park = "all", from = 2006, to = 2024) |>
+  arrange(Plot_Name, SampleYear, MicroplotCode, DBHcm) |>
+  group_by(Plot_Name) |>
+  mutate(sap_order = row_number(),
+         tree_id = paste0(Plot_Name, "-sap", sprintf("%03d", sap_order)),
+         TreeStatusCode = "live",
+         CrownClassCode = 5,
+         DecayClassCode = NA_real_,
+         Fork = NA_character_) |>
+  ungroup() |>
+  select(tree_id, Plot_Name, Network, ParkUnit, ParkSubUnit, SampleYear, cycle,
+         TSN, ScientificName, Fork, DBHcm, TreeStatusCode, CrownClassCode, DecayClassCode,
+         num_stems = Count) |>
+  filter(!ScientificName %in% c("Not Sampled", "None present"))
+
+sap_micros <- joinMicroSaplings(park = "all", from = 2006, to = 2024) |>
+  filter(!ScientificName %in% c("Not Sampled")) |>
+  select(Plot_Name, SampleYear, MicroplotCode) |> unique() |>
+  group_by(Plot_Name, SampleYear) |>
+  summarize(num_micros = sum(!is.na(MicroplotCode)), .groups = "drop")
+
+table(sap_micros$num_micros, useNA = "always")
+
+saps2 <- left_join(saps, sap_micros, by = c("Plot_Name", "SampleYear"))
+
+# Fixing an unknown spp that is likely ACESAC based on other visits
+saps2$TSN[saps2$tree_id == "WEFA-001-sap009"] <- 28731
+saps2$ScientificName[saps2$tree_id == "WEFA-001-sap009"] <- "Acer saccharum"
+
+# Join USDA Plants Symbol and drop stunted woodland plots
+taxa <- VIEWS_NETN$Taxa_NETN[,c("TSN", "TaxonCode")]
+
+saps3 <- left_join(saps2, taxa, by = "TSN") |>
+  filter(!Plot_Name %in% stunted$Plot_Name)
+
+table(saps3$TaxonCode, useNA = 'always') # 2 NAs
+# Species names missing SPCD b/c of synonyms
+# Betula cordifolia; replace with Betula papyrifera; BEPA
+# Betula X cearulea; replace with Betula papyrifera; BEPA
+# Carya tomentosa: replace with Carya alba; CAAL27
+# Photinia villosa doesn't have a SPCD. The closest match is Photinia x fraseri or Photinia davidiana
+saps3$TaxonCode[saps3$ScientificName == "Betula cordifolia"] <- "BEPA"
+saps3$TaxonCode[saps3$ScientificName == "Betula X cearulea"] <- "BEPA"
+saps3$TaxonCode[saps3$ScientificName == "Carya tomentosa"] <- "CAAL27"
+
+saps3$ScientificName[saps3$TSN == -9999999937] <- "Unknown species"
+saps3$TSN[saps3$TSN == -9999999937] <- -9999999950
+
+# Join REF_SPECIES SPCD and JENKINS_SPGRPCD to tree data
+saps4 <- left_join(saps3, refspp, by = c("TaxonCode" = "SPECIES_SYMBOL"))
+sapspp_na <- saps4 |> filter(is.na(SPCD)) |> select(ScientificName)
+
+micro_size_m2 = 2*2*pi
+
+saps5 <- saps4 |> mutate(tpa_unadj = ((micro_size_m2 * num_micros)/4046.86)^-1,
+                         ht = NA_real_,
+                         htcd = NA_real_,
+                         cull = 0,
+                         habit = "Sapling",
+                         statusclassifier = "unknown") |>
+  select(plt_cn = Plot_Name, tre_cn = tree_id, network = Network, park = ParkUnit, parksubunit = ParkSubUnit,
+         year = SampleYear, cycle, tpa_unadj,
+         spcd = SPCD, jenkins_spgrpcd = JENKINS_SPGRPCD, scientific_name = ScientificName, usda_symbol = TaxonCode,
+         statuscd = TreeStatusCode, statusclassifier, treeclcd = CrownClassCode,
+         dbhcm = DBHcm, ht, htcd, cull, habit, decaycd = DecayClassCode)
+
+saps_plots <- right_join(plots_final, saps5, by = c("plt_cn", "park", "parksubunit", "network"))
+head(data.frame(saps_plots))
+
+setdiff(names(saps_plots), names(tree_plots))
+setdiff(names(tree_plots), names(saps_plots))
+
+tree_sap <- rbind(tree_plots, saps_plots) |> filter(!plt_cn %in% stunted$Plot_Name)
+# Update SPCD to use use 999 for unknown tree, 998 for unknown hardwood/broadleaf, and 299 for unknown conifer
+# based on REF_SPECIES.csv
+tree_sap$spcd[tree_sap$scientific_name == "Unknown species"] <- 999
+tree_sap$spcd[tree_sap$scientific_name == "Unknown Hardwood"] <- 998
+tree_sap$spcd[tree_sap$scientific_name == "Unknown Conifer"] <- 299
+
+write.csv(tree_sap, "./data/NETN_tree_sapling_data.csv", row.names = F)
+
+#---- Metadata for tree and sapling data ----
+meta <- data.frame(column_name = names(tree_sap),
+                   description = NA_character_,
+                   units = NA_character_,
+                   NETN = NA_character_)
+
+meta$description[meta$column_name == "plt_cn"] <- "Unique plot identifier using 4-letter park code and 3-digit plot number"
+meta$units[meta$column_name == "plt_cn"] <- NA_character_
+meta$NETN[meta$column_name == "plt_cn"] <- "Plot numbers are unique to parks, but not the network"
+
+meta$description[meta$column_name == "tre_cn"] <- "Unique tree identifier using plot_cn and tree tag number"
+meta$units[meta$column_name == "tre_cn"] <- NA_character_
+meta$NETN[meta$column_name == "tre_cn"] <- "Tree tag numbers are unique to plots, but not the park or network. Saplings are not tagged, and are given a unique number based on when they were sampled. Sapling ids are therefore not linkable across time."
+
+meta$description[meta$column_name == "ecosubcd"] <- "Ecological subsection code"
+meta$description[meta$column_name == "ecodivision"] <- "Ecological subsection code"
+
+meta$description[meta$column_name == "year"] <- "Year plot was sampled, ranging from 2006-2024"
+
+meta$description[meta$column_name == "cycle"] <- "Number of times a plot has been visited"
+meta$units[meta$column_name == "cycle"] <- NA_character_
+meta$NETN[meta$column_name == "cycle"] <- "Plots are typically sampled on a 4-year rotation, with cycle 1 being 2006-2009. The sampling schedule was disrupted by COVID in 2020 and 2021, so that some parks/plots have 5 or 6 year intervals between visits."
+
+meta$description[meta$column_name == "tpa_unadj"] <- "Tree and sapling expansion factor for sampling area. Equates to 1/acres of sampling area."
+meta$units[meta$column_name == "tpa_unadj"] <- "1/acre"
+meta$NETN[meta$column_name == "tpa_unadj"] <- "In 2006, only 1 microplot was sampled for saplings. In 2007 and on, 3 microplots were sampled. The tpa_unadj reflects that change."
+
+meta$description[meta$column_name == "lat"] <- "Latitude of plot center in NAD83"
+meta$units[meta$column_name == "lat"] <- "decimal degrees"
+
+meta$description[meta$column_name == "long"] <- "Longitude of plot center in NAD83"
+meta$units[meta$column_name == "long"] <- "decimal degrees"
+
+meta$description[meta$column_name == "network"] <- "4-letter network code"
+meta$description[meta$column_name == "park"] <- "4-letter park code"
+meta$description[meta$column_name == "parksubunit"] <- "Subunit within a park as potential grouping variable."
+meta$description[meta$column_name == "state_name"] <- "State park occurs in."
+meta$description[meta$column_name == "statecd"] <- "State FIPS code"
+meta$description[meta$column_name == "countycd"] <- "County FIPS code"
+meta$description[meta$column_name == "spcd"] <- "Species code used by FIA taken from REF_SPECIES. When a species code doesn't exist, code is NA."
+meta$description[meta$column_name == "jenkins_spgrpcd"] <- "Jenkins species group used by FIA and taken from REF_SPECIES"
+meta$description[meta$column_name == "scientific_name"] <- "Latin name"
+meta$description[meta$column_name == "usda_symbol"] <- "USDA Plants Symbol"
+meta$description[meta$column_name == "statuscd"] <- "Tree status: dead or live"
+
+meta$description[meta$column_name == "statusclassifier"] <-
+  "Indicates whether stem is standing, leaning (30-45 degrees) or fallen (>45degrees)"
+meta$NETN[meta$column_name == "statusclassifier"] <-
+  "Only recorded for trees, not saplings. Classifier wasn't recorded until 2010 and later."
+
+meta$description[meta$column_name == "treeclcd"] <- "Crown class of tree. 1 = open grown; 2 = dominant; 3 = codominant; 4 = intermediate; 5 = subcanopy; 6 = gap exploiter"
+meta$NETN[meta$column_name == "treecld"] <- "Gap exploiter is either an intermediate or subcanopy tree expected to grow faster than normal because it is within a canopy gap."
+
+meta$description[meta$column_name == "dbhcm"] <- "DBH of tree or sapling."
+meta$units[meta$column_name == "dbhcm"] <- "cm"
+
+meta$description[meta$column_name == "ht"] <- "Height of tree"
+meta$units[meta$column_name == "ht"] <- "meters"
+
+meta$description[meta$column_name == "htcd"] <- "Indicates how tree height was assigned. 1 = the individual tree was measured for tree height. 4 = the height was derived."
+
+meta$description[meta$column_name == "cull"] <- "Percent of wood considered cull from 0 to 1 based on recorded tree conditions."
+
+meta$description[meta$column_name == "habit"] <- "Denotes if stem is a tree or sapling. Trees are defined as 1) any live stem >=10cm DBH regardless of whether it is standing, leaning or fallen, or 2) any dead stem >= 10cm DBH that is standing or leaning. Saplings are stems >= 1cm DBH and <10cm DBH and are only measured if live."
+meta$NETN[meta$column_name == "habit"] <- "Individual saplings are not tracked over time, and sometimes are missed across years because crews because QA/QC isn't as strict as with trees."
+
+meta$description[meta$column_name == "decaycd"] <- "FIA decay class for snags ranging from 1-5."
+
+
+#++++ Questions for group ++++
+# 1.  Photinia villosa doesn't have a SPCD. The closest match is Photinia x fraseri or Photinia davidiana. Do I use
+#     one of those codes, or leave it blank? This is mainly for saplings.
+# 2. I set sapling crown class code as subcanopy. Is that okay? I did not add a height. Should?
+
+
 
 
