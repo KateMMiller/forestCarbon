@@ -1,35 +1,31 @@
 #-----------------------------------------------------------------------------
-# Compiling Northeast Temperate Network forest data for forest carbon project
-#   Parks included: ACAD, MABI, MIMA, MORR, ROVA, SAGA, SARA, WEFA
+# Compiling Mid-Atlantic Network forest data for forest carbon project
+#   Parks included: ASIS, APCO, BOWA, COLO, FRSP, GETT, GEWA, HOFU, PETE, RICH, SAHI,
 #-----------------------------------------------------------------------------
 
-library(forestNETN) # can be installed via: devtools::install_github("katemmiller/forestNETN")
+library(forestMIDN) # can be installed via: devtools::install_github("katemmiller/forestMIDN")
 library(tidyverse)
 library(sf)
 library(rgeoboundaries) # for state/county boundaries
 library(tidycensus) # for FIPS state/county codes
 # dir.create("./data")
 
-# import latest NETN data. Can either import with zip file below, or via NPSutils package
-# from irma.nps.gov
-# importCSV(path = "./data", zip_name = "NETN_forest_data_package_20240926.zip")
+# import latest MIDN data
+devtools::install_github('nationalparkservice/NPSutils')
 
-#devtools::install_github('nationalparkservice/NPSutils')
+NPSutils::get_data_package(2306436)
+dat <- NPSutils::load_data_package(2306436)
+names(dat) <- gsub("pkg_2306436.", "", names(dat))
+VIEWS_MIDN <- new.env()
+list2env(dat, envir = VIEWS_MIDN)
 
-NPSutils::get_data_package(2306029)
-dat <- NPSutils::load_data_package(2306029)
-names(dat) <- gsub("pkg_2306029.", "", names(dat))
-VIEWS_NETN <- new.env()
-list2env(dat, envir = VIEWS_NETN)
-rm(dat)
-
-#--dat#---- Download and compile external data -----
+#---- Download and compile external data -----
 # Download FIA REF_SPECIES.csv to get SPCD
-ref_url <- "https://apps.fs.usda.gov/fia/datamart/CSV/FIADB_REFERENCE.zip"
-download.file(ref_url, "./data/FIADB_REFERENCE.zip")
+#ref_url <- "https://apps.fs.usda.gov/fia/datamart/CSV/FIADB_REFERENCE.zip"
+#download.file(ref_url, "./data/FIADB_REFERENCE.zip")
 refspp <- read.csv(unzip("./data/FIADB_REFERENCE.zip", "REF_SPECIES.csv")) |>
   select(SPCD, SPECIES_SYMBOL, SCIENTIFIC_NAME, GENUS, SPECIES, JENKINS_SPGRPCD)
-#file.remove("REF_SPECIES.csv")
+file.remove("REF_SPECIES.csv")
 write.csv(refspp, "./data/REF_SPECIES.csv", row.names = F)
 
 # Download Ecological Province shapefile
