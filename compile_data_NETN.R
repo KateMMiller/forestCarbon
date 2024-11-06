@@ -102,7 +102,7 @@ tmap_options(max.categories = 37) # b/c 37 provinces
 tm_shape(ecoprov, bbox = plots_sf) + tm_fill("MAP_UNIT_S") +
  tm_shape(us_county) + tm_borders() +
  tm_shape(us_states) + tm_borders(lwd = 1.5) +
-  tm_shape(plots_sf) + tm_dots()
+ tm_shape(plots_sf) + tm_dots()
 
 # join state and county data to plot locations
 plots_comb <- left_join(plots_state, plots_county, by = c("Plot_Name"))
@@ -113,7 +113,7 @@ head(plots_comb2)
 plots2 <- left_join(
   plots |> select(Plot_Name, Network, ParkUnit, ParkSubUnit, Lat, Long, IsStuntedWoodland) |> unique(),
   plots_eco, by = "Plot_Name"
-)
+) |> filter(IsStuntedWoodland == FALSE)
 
 plots_final <- left_join(plots2, plots_comb2, by = c("Plot_Name", "ParkUnit")) |>
   select(plt_cn = Plot_Name, park = ParkUnit, parksubunit = ParkSubUnit,  network = Network,
@@ -121,6 +121,7 @@ plots_final <- left_join(plots2, plots_comb2, by = c("Plot_Name", "ParkUnit")) |
          countycd = county_code)
 
 head(plots_final)
+length(unique(plots_final$plt_cn)) #347 without stunted woodlands
 # This is the left df to join tree and sapling data to.
 
 #---- Compile NETN tree data ----
@@ -304,10 +305,11 @@ saps3 <- left_join(saps2, taxa, by = "TSN") |>
 # Betula cordifolia; replace with Betula papyrifera; BEPA
 # Betula X cearulea; replace with Betula papyrifera; BEPA
 # Carya tomentosa: replace with Carya alba; CAAL27
-# Photinia villosa doesn't have a SPCD. The closest match is Photinia x fraseri or Photinia davidiana
+# Photinia villosa doesn't have a SPCD. The closest match is Photinia davidiana
 saps3$TaxonCode[saps3$ScientificName == "Betula cordifolia"] <- "BEPA"
 saps3$TaxonCode[saps3$ScientificName == "Betula X cearulea"] <- "BEPA"
 saps3$TaxonCode[saps3$ScientificName == "Carya tomentosa"] <- "CAAL27"
+saps3$TaxonCode[saps3$ScientificName == "Photinia villosa"] <- "PHDA5"
 
 saps3$ScientificName[saps3$TSN == -9999999937] <- "Unknown species"
 saps3$TSN[saps3$TSN == -9999999937] <- -9999999950
@@ -350,6 +352,8 @@ tree_sap$spcd[tree_sap$scientific_name == "Unknown Conifer"] <- 299 #4
 tree_sap$jenkins_spgrpcd[tree_sap$scientific_name == "Unknown species"] <- 8
 tree_sap$jenkins_spgrpcd[tree_sap$scientific_name == "Unknown Hardwood"] <- 8
 tree_sap$jenkins_spgrpcd[tree_sap$scientific_name == "Unknown Conifer"] <- 4
+
+length(unique(tree_sap$plt_cn)) #347
 
 write.csv(tree_sap, "./data/NETN_tree_sapling_data.csv", row.names = F)
 
@@ -416,11 +420,6 @@ meta$NETN[meta$column_name == "habit"] <- "Individual saplings are not tracked o
 
 meta$description[meta$column_name == "decaycd"] <- "FIA decay class for snags ranging from 1-5."
 write.csv(meta, "./data/metadata_NETN.csv", row.names = F)
-
-#++++ Questions for group ++++
-# 1.  Photinia villosa doesn't have a SPCD. The closest match is Photinia x fraseri or Photinia davidiana. Do I use
-#     one of those codes, or leave it blank? This is mainly for saplings.
-# 2. I set sapling crown class code as subcanopy. Is that okay? I did not add a height. Should?
 
 
 
