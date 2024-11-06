@@ -353,6 +353,9 @@ tree_sap$jenkins_spgrpcd[tree_sap$scientific_name == "Unknown species"] <- 8
 tree_sap$jenkins_spgrpcd[tree_sap$scientific_name == "Unknown Hardwood"] <- 8
 tree_sap$jenkins_spgrpcd[tree_sap$scientific_name == "Unknown Conifer"] <- 4
 
+# Add 0 to decay class for live trees, so NAs mean it wasn't recorded.
+tree_sap$decaycd[tree_sap$statuscd == "live"] <- 0
+
 length(unique(tree_sap$plt_cn)) #347
 
 write.csv(tree_sap, "./data/NETN_tree_sapling_data.csv", row.names = F)
@@ -418,7 +421,7 @@ meta$description[meta$column_name == "cull"] <- "Percent of wood considered cull
 meta$description[meta$column_name == "habit"] <- "Denotes if stem is a tree or sapling. Trees are defined as 1) any live stem >=10cm DBH regardless of whether it is standing, leaning or fallen, or 2) any dead stem >= 10cm DBH that is standing or leaning. Saplings are stems >= 1cm DBH and <10cm DBH and are only measured if live."
 meta$NETN[meta$column_name == "habit"] <- "Individual saplings are not tracked over time, and sometimes are missed across years because crews because QA/QC isn't as strict as with trees."
 
-meta$description[meta$column_name == "decaycd"] <- "FIA decay class for snags ranging from 1-5."
+meta$description[meta$column_name == "decaycd"] <- "FIA decay class for snags ranging from 1-5. Live trees are given a code of 0. Dead trees with missing decay classes are NA"
 write.csv(meta, "./data/metadata_NETN.csv", row.names = F)
 
 
