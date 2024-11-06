@@ -8,50 +8,42 @@ library(tidyverse)
 library(sf)
 library(rgeoboundaries) # for state/county boundaries
 library(tidycensus) # for FIPS state/county codes
+library(tmap) # to check plots vs ecoregion layers
+
 # dir.create("./data")
 
-# import latest NETN data. Can either import with zip file below, or via NPSutils package
-# from irma.nps.gov
-# importCSV(path = "./data", zip_name = "NETN_forest_data_package_20240926.zip")
+# import latest NETN data.
+importCSV(path = "./data", zip_name = "NETN_forest_data_package_20240926.zip")
 
-#devtools::install_github('nationalparkservice/NPSutils')
-
-NPSutils::get_data_package(2306029)
-dat <- NPSutils::load_data_package(2306029)
-names(dat) <- gsub("pkg_2306029.", "", names(dat))
-VIEWS_NETN <- new.env()
-list2env(dat, envir = VIEWS_NETN)
-rm(dat)
-
-#--dat#---- Download and compile external data -----
+#---- Download and compile external data -----
 # Download FIA REF_SPECIES.csv to get SPCD
 ref_url <- "https://apps.fs.usda.gov/fia/datamart/CSV/FIADB_REFERENCE.zip"
 download.file(ref_url, "./data/FIADB_REFERENCE.zip")
 refspp <- read.csv(unzip("./data/FIADB_REFERENCE.zip", "REF_SPECIES.csv")) |>
   select(SPCD, SPECIES_SYMBOL, SCIENTIFIC_NAME, GENUS, SPECIES, JENKINS_SPGRPCD)
 #file.remove("REF_SPECIES.csv")
-write.csv(refspp, "./data/REF_SPECIES.csv", row.names = F)
+#write.csv(refspp, "./data/REF_SPECIES.csv", row.names = F)
 
 # Download Ecological Province shapefile
 ecoprov_url <- "https://data.fs.usda.gov/geodata/edw/edw_resources/shp/S_USA.EcoMapProvinces.zip"
 download.file(ecoprov_url, "./data/S_USA.EcoMapProvinces.zip")
 unzip("./data/S_USA.EcoMapProvinces.zip", exdir = "./data")
-ecoprov <- read_sf("./data/S_USA.EcoMapProvinces.shp")
-# st_crs(ecoprov) #EPSG 4269 NAD83 latlong
+ecoprov <- read_sf("./data/S_USA.EcoMapProvinces.shp") |> st_transform(4326)
+st_crs(ecoprov) #EPSG 4326 WGS84 latlong
 
 # Download Ecological Subsection shapefile
 ecosub_url <- "https://data.fs.usda.gov/geodata/edw/edw_resources/shp/S_USA.EcomapSubsections.zip"
 download.file(ecosub_url, "./data/S_USA.EcomapSubsections.zip")
 unzip("./data/S_USA.EcomapSubsections.zip", exdir = "./data")
-ecosub <- read_sf("./data/S_USA.EcomapSubsections.shp")
-# st_crs(ecosub) #EPSG 4269 NAD83 latlong
+ecosub <- read_sf("./data/S_USA.EcomapSubsections.shp") |> st_transform(4326)
+st_crs(ecosub) #EPSG 4326 WGS84 latlong
 
 #---- Spatial join NETN plots to Ecological Province and Subsection ----
 plots <- joinLocEvent(output = 'verbose')
 plots1 <- plots |> select(Plot_Name, ParkUnit, Lat, Long) |>
   mutate(lat = Lat, long = Long) |> unique()
-plots_sf <- st_as_sf(plots1, coords = c("Long", "Lat"), crs = 4269)
-sf_use_s2(FALSE) # troubleshooting st_join
+plots_sf <- st_as_sf(plots1, coords = c("Long", "Lat"), crs = 4326)
+sf_use_s2(FALSE) # troubleshooting st_join for next line
 
 # Province
 plots_ecoprov <- st_join(plots_sf, ecoprov, left = TRUE) |>
@@ -60,7 +52,7 @@ plots_ecoprov <- st_join(plots_sf, ecoprov, left = TRUE) |>
   as.data.frame() |>
   arrange(Plot_Name)
 
-# Some ACAD plots are classified as water instead of Northeastern Mixed Forest Province/211
+# Some Atmap# Some ACAD plots are classified as water instead of Northeastern Mixed Forest Province/211
 # Manually fixing below:
 plots_ecoprov$MAP_UNIT_S[plots_ecoprov$ParkUnit == "ACAD"] <- "211"
 plots_ecoprov$MAP_UNIT_N[plots_ecoprov$ParkUnit == "ACAD"] <- "Northeastern Mixed Forest Province"
@@ -94,15 +86,25 @@ plots_eco <- left_join(plots_ecoprov |> select(-MAP_UNIT_N, -MAP_UNIT_S),
   select(Plot_Name, ecodivision = PROVINCE, ecosubcd = SUBSECTION)
 
 #---- State, county and FIPS Codes ----
-us_states <- st_transform(geoboundaries("USA", "adm1"), 4269)
-us_county <- st_transform(geoboundaries("USA", "adm2"), 4269)
+us_states <- geoboundaries("USA", "adm1")
+us_county <- geoboundaries("USA", "adm2")
 plots_state <- st_join(plots_sf, us_states, left = T) |> select(Plot_Name, state_name = shapeName) |>
   st_drop_geometry()
+
 plots_county <- st_join(plots_sf, us_county, left = T) |>
   mutate(county = paste0(shapeName, " County")) |>
   select(Plot_Name, ParkUnit, county) |>
   st_drop_geometry()
 
+# Check that plots are showing up in right place
+tmap_options(max.categories = 37) # b/c 37 provinces
+
+tm_shape(ecoprov, bbox = plots_sf) + tm_fill("MAP_UNIT_S") +
+ tm_shape(us_county) + tm_borders() +
+ tm_shape(us_states) + tm_borders(lwd = 1.5) +
+  tm_shape(plots_sf) + tm_dots()
+
+# join state and county data to plot locations
 plots_comb <- left_join(plots_state, plots_county, by = c("Plot_Name"))
 data("fips_codes")
 plots_comb2 <- left_join(plots_comb, fips_codes, by = c("state_name", "county"))
@@ -257,12 +259,10 @@ tree_plots <- left_join(plots_final, tree6, by = c("plt_cn")) |>
   select(plt_cn,  tre_cn, ecosubcd, ecodivision, year, cycle, tpa_unadj,
          lat, long, network, park, parksubunit, state_name, statecd, countycd,
          spcd, jenkins_spgrpcd, scientific_name, usda_symbol,
-         statuscd, statusclassifier, treeclcd,
+         statuscd, treeclcd,
          dbhcm, ht, htcd, cull, habit, decaycd)
 head(tree_plots)
 names(tree_plots)
-
-#write.csv(tree_plots, "./data/NETN_tree_data_WIP.csv", row.names = F)
 
 #---- Compile NETN sapling data ----
 saps <- joinMicroSaplings(park = "all", from = 2006, to = 2024) |>
@@ -300,7 +300,6 @@ taxa <- VIEWS_NETN$Taxa_NETN[,c("TSN", "TaxonCode")]
 saps3 <- left_join(saps2, taxa, by = "TSN") |>
   filter(!Plot_Name %in% stunted$Plot_Name)
 
-table(saps3$TaxonCode, useNA = 'always') # 2 NAs
 # Species names missing SPCD b/c of synonyms
 # Betula cordifolia; replace with Betula papyrifera; BEPA
 # Betula X cearulea; replace with Betula papyrifera; BEPA
@@ -312,6 +311,8 @@ saps3$TaxonCode[saps3$ScientificName == "Carya tomentosa"] <- "CAAL27"
 
 saps3$ScientificName[saps3$TSN == -9999999937] <- "Unknown species"
 saps3$TSN[saps3$TSN == -9999999937] <- -9999999950
+
+table(saps3$TaxonCode, useNA = 'always') # 1 NA that's an unknown species
 
 # Join REF_SPECIES SPCD and JENKINS_SPGRPCD to tree data
 saps4 <- left_join(saps3, refspp, by = c("TaxonCode" = "SPECIES_SYMBOL"))
@@ -328,7 +329,7 @@ saps5 <- saps4 |> mutate(tpa_unadj = ((micro_size_m2 * num_micros)/4046.86)^-1,
   select(plt_cn = Plot_Name, tre_cn = tree_id, network = Network, park = ParkUnit, parksubunit = ParkSubUnit,
          year = SampleYear, cycle, tpa_unadj,
          spcd = SPCD, jenkins_spgrpcd = JENKINS_SPGRPCD, scientific_name = ScientificName, usda_symbol = TaxonCode,
-         statuscd = TreeStatusCode, statusclassifier, treeclcd = CrownClassCode,
+         statuscd = TreeStatusCode, treeclcd = CrownClassCode,
          dbhcm = DBHcm, ht, htcd, cull, habit, decaycd = DecayClassCode)
 
 saps_plots <- right_join(plots_final, saps5, by = c("plt_cn", "park", "parksubunit", "network"))
@@ -337,12 +338,18 @@ head(data.frame(saps_plots))
 setdiff(names(saps_plots), names(tree_plots))
 setdiff(names(tree_plots), names(saps_plots))
 
+#---- Bind tree and sapling data ----
 tree_sap <- rbind(tree_plots, saps_plots) |> filter(!plt_cn %in% stunted$Plot_Name)
 # Update SPCD to use use 999 for unknown tree, 998 for unknown hardwood/broadleaf, and 299 for unknown conifer
 # based on REF_SPECIES.csv
-tree_sap$spcd[tree_sap$scientific_name == "Unknown species"] <- 999
-tree_sap$spcd[tree_sap$scientific_name == "Unknown Hardwood"] <- 998
-tree_sap$spcd[tree_sap$scientific_name == "Unknown Conifer"] <- 299
+tree_sap$spcd[tree_sap$scientific_name == "Unknown species"] <- 999 #8
+tree_sap$spcd[tree_sap$scientific_name == "Unknown Hardwood"] <- 998 #8
+tree_sap$spcd[tree_sap$scientific_name == "Unknown Conifer"] <- 299 #4
+# Update Jenkins as 8 for unknown tree, 8 for unknown hardwood/broadleaf, and 4 for unknown conifer
+# based on REF_SPECIES.csv
+tree_sap$jenkins_spgrpcd[tree_sap$scientific_name == "Unknown species"] <- 8
+tree_sap$jenkins_spgrpcd[tree_sap$scientific_name == "Unknown Hardwood"] <- 8
+tree_sap$jenkins_spgrpcd[tree_sap$scientific_name == "Unknown Conifer"] <- 4
 
 write.csv(tree_sap, "./data/NETN_tree_sapling_data.csv", row.names = F)
 
@@ -373,10 +380,10 @@ meta$description[meta$column_name == "tpa_unadj"] <- "Tree and sapling expansion
 meta$units[meta$column_name == "tpa_unadj"] <- "1/acre"
 meta$NETN[meta$column_name == "tpa_unadj"] <- "In 2006, only 1 microplot was sampled for saplings. In 2007 and on, 3 microplots were sampled. The tpa_unadj reflects that change."
 
-meta$description[meta$column_name == "lat"] <- "Latitude of plot center in NAD83"
+meta$description[meta$column_name == "lat"] <- "Latitude of plot center in WGS84"
 meta$units[meta$column_name == "lat"] <- "decimal degrees"
 
-meta$description[meta$column_name == "long"] <- "Longitude of plot center in NAD83"
+meta$description[meta$column_name == "long"] <- "Longitude of plot center in WGS84"
 meta$units[meta$column_name == "long"] <- "decimal degrees"
 
 meta$description[meta$column_name == "network"] <- "4-letter network code"
@@ -390,11 +397,6 @@ meta$description[meta$column_name == "jenkins_spgrpcd"] <- "Jenkins species grou
 meta$description[meta$column_name == "scientific_name"] <- "Latin name"
 meta$description[meta$column_name == "usda_symbol"] <- "USDA Plants Symbol"
 meta$description[meta$column_name == "statuscd"] <- "Tree status: dead or live"
-
-meta$description[meta$column_name == "statusclassifier"] <-
-  "Indicates whether stem is standing, leaning (30-45 degrees) or fallen (>45degrees)"
-meta$NETN[meta$column_name == "statusclassifier"] <-
-  "Only recorded for trees, not saplings. Classifier wasn't recorded until 2010 and later."
 
 meta$description[meta$column_name == "treeclcd"] <- "Crown class of tree. 1 = open grown; 2 = dominant; 3 = codominant; 4 = intermediate; 5 = subcanopy; 6 = gap exploiter"
 meta$NETN[meta$column_name == "treecld"] <- "Gap exploiter is either an intermediate or subcanopy tree expected to grow faster than normal because it is within a canopy gap."
