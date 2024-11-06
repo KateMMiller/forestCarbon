@@ -52,7 +52,7 @@ plots_ecoprov <- st_join(plots_sf, ecoprov, left = TRUE) |>
   as.data.frame() |>
   arrange(Plot_Name)
 
-# Some Atmap# Some ACAD plots are classified as water instead of Northeastern Mixed Forest Province/211
+# Some ACAD plots are classified as water instead of Northeastern Mixed Forest Province/211
 # Manually fixing below:
 plots_ecoprov$MAP_UNIT_S[plots_ecoprov$ParkUnit == "ACAD"] <- "211"
 plots_ecoprov$MAP_UNIT_N[plots_ecoprov$ParkUnit == "ACAD"] <- "Northeastern Mixed Forest Province"
