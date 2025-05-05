@@ -1,44 +1,44 @@
 #-----------------------------------------------------------------------------
-# Compiling Northeast Temperate Network forest data for forest carbon project
-#   Parks included: ACAD, MABI, MIMA, MORR, ROVA, SAGA, SARA, WEFA
+# Compiling Mid-Atlantic Network forest data for forest carbon project
+#   Parks included: ASIS, APCO, BOWA, COLO, FRSP, GETT, GEWA, HOFU, PETE, RICH, SAHI, THST, VAFO
 #-----------------------------------------------------------------------------
 
-library(forestNETN) # can be installed via: devtools::install_github("katemmiller/forestNETN")
+library(forestMIDN) # can be installed via: devtools::install_github("katemmiller/forestMIDN")
 library(tidyverse)
 library(sf)
 library(rgeoboundaries) # for state/county boundaries
 library(tidycensus) # for FIPS state/county codes
 library(tmap) # to check plots vs ecoregion layers
-
 # dir.create("./data")
+#remotes::install_github('r-tmap/tmap')
 
-# import latest NETN data.
-importCSV(path = "./data", zip_name = "NETN_forest_data_package_20240926.zip")
+# import latest MIDN data.
+importCSV(path = "./data/", zip_name = "MIDN_NCBN_Forest_20241106.zip")
 
 #---- Download and compile external data -----
 # Download FIA REF_SPECIES.csv to get SPCD
-ref_url <- "https://apps.fs.usda.gov/fia/datamart/CSV/FIADB_REFERENCE.zip"
-download.file(ref_url, "./data/FIADB_REFERENCE.zip")
+#ref_url <- "https://apps.fs.usda.gov/fia/datamart/CSV/FIADB_REFERENCE.zip"
+#download.file(ref_url, "./data/FIADB_REFERENCE.zip")
 refspp <- read.csv(unzip("./data/FIADB_REFERENCE.zip", "REF_SPECIES.csv")) |>
   select(SPCD, SPECIES_SYMBOL, SCIENTIFIC_NAME, GENUS, SPECIES, JENKINS_SPGRPCD)
 #file.remove("REF_SPECIES.csv")
 #write.csv(refspp, "./data/REF_SPECIES.csv", row.names = F)
 
 # Download Ecological Province shapefile
-ecoprov_url <- "https://data.fs.usda.gov/geodata/edw/edw_resources/shp/S_USA.EcoMapProvinces.zip"
-download.file(ecoprov_url, "./data/S_USA.EcoMapProvinces.zip")
+#ecoprov_url <- "https://data.fs.usda.gov/geodata/edw/edw_resources/shp/S_USA.EcoMapProvinces.zip"
+#download.file(ecoprov_url, "./data/S_USA.EcoMapProvinces.zip")
 unzip("./data/S_USA.EcoMapProvinces.zip", exdir = "./data")
 ecoprov <- read_sf("./data/S_USA.EcoMapProvinces.shp") |> st_transform(4326)
 st_crs(ecoprov) #EPSG 4326 WGS84 latlong
 
 # Download Ecological Subsection shapefile
-ecosub_url <- "https://data.fs.usda.gov/geodata/edw/edw_resources/shp/S_USA.EcomapSubsections.zip"
-download.file(ecosub_url, "./data/S_USA.EcomapSubsections.zip")
+#ecosub_url <- "https://data.fs.usda.gov/geodata/edw/edw_resources/shp/S_USA.EcomapSubsections.zip"
+#download.file(ecosub_url, "./data/S_USA.EcomapSubsections.zip")
 unzip("./data/S_USA.EcomapSubsections.zip", exdir = "./data")
 ecosub <- read_sf("./data/S_USA.EcomapSubsections.shp") |> st_transform(4326)
 st_crs(ecosub) #EPSG 4326 WGS84 latlong
 
-#---- Spatial join NETN plots to Ecological Province and Subsection ----
+#---- Spatial join MIDN plots to Ecological Province and Subsection ----
 plots <- joinLocEvent(output = 'verbose')
 plots1 <- plots |> select(Plot_Name, ParkUnit, Lat, Long) |>
   mutate(lat = Lat, long = Long) |> unique()
@@ -52,11 +52,13 @@ plots_ecoprov <- st_join(plots_sf, ecoprov, left = TRUE) |>
   as.data.frame() |>
   arrange(Plot_Name)
 
-# Some ACAD plots are classified as water instead of Northeastern Mixed Forest Province/211
+table(plots_ecoprov$MAP_UNIT_N)
+
+# Some COLO and GEWA plots are classified as water instead of 232, Outer Coastal Plain Mixed Forest Province
 # Manually fixing below:
-plots_ecoprov$MAP_UNIT_S[plots_ecoprov$ParkUnit == "ACAD"] <- "211"
-plots_ecoprov$MAP_UNIT_N[plots_ecoprov$ParkUnit == "ACAD"] <- "Northeastern Mixed Forest Province"
-plots_ecoprov$PROVINCE[plots_ecoprov$ParkUnit == "ACAD"] <- 8
+plots_ecoprov$MAP_UNIT_S[plots_ecoprov$ParkUnit %in% c("GEWA", "COLO")] <- "232"
+plots_ecoprov$MAP_UNIT_N[plots_ecoprov$ParkUnit %in% c("GEWA", "COLO")] <- "Outer Coastal Plain Mixed Forest Province"
+plots_ecoprov$PROVINCE[plots_ecoprov$ParkUnit %in% c("GEWA", "COLO")] <- 35
 
 table(plots_ecoprov$MAP_UNIT_N, plots_ecoprov$ParkUnit) # No more Water
 table(plots_ecoprov$MAP_UNIT_S, plots_ecoprov$ParkUnit) # No more Water
@@ -69,11 +71,11 @@ plots_ecosub <- st_join(plots_sf, ecosub, left = TRUE) |>
   as.data.frame() |>
   arrange(Plot_Name)
 
-# Some ACAD plots are classified as water instead of Maine Eastern Coastal.
+# Some COLO/GEWA plots are classified as water or tidal
 # Manually fixing below:
-plots_ecosub$MAP_UNIT_S[plots_ecosub$ParkUnit == "ACAD"] <- "211Cb"
-plots_ecosub$MAP_UNIT_N[plots_ecosub$ParkUnit == "ACAD"] <- "Maine Eastern Coastal"
-plots_ecosub$SUBSECTION[plots_ecosub$ParkUnit == "ACAD"] <- 322
+plots_ecosub$MAP_UNIT_S[plots_ecosub$ParkUnit %in% c("COLO", "GEWA")] <- "232Ha"
+plots_ecosub$MAP_UNIT_N[plots_ecosub$ParkUnit %in% c("COLO", "GEWA")] <- "Atlantic Southern Loam Hills"
+plots_ecosub$SUBSECTION[plots_ecosub$ParkUnit %in% c("COLO", "GEWA")] <- 882
 
 table(plots_ecosub$MAP_UNIT_N, plots_ecosub$ParkUnit) # No more Water
 table(plots_ecosub$MAP_UNIT_S, plots_ecosub$ParkUnit) # No more Water
@@ -100,9 +102,9 @@ plots_county <- st_join(plots_sf, us_county, left = T) |>
 tmap_options(max.categories = 37) # b/c 37 provinces
 
 tm_shape(ecoprov, bbox = plots_sf) + tm_fill("MAP_UNIT_S") +
- tm_shape(us_county) + tm_borders() +
- tm_shape(us_states) + tm_borders(lwd = 1.5) +
- tm_shape(plots_sf) + tm_dots()
+  tm_shape(us_county) + tm_borders() +
+  tm_shape(us_states) + tm_borders(lwd = 1.5) +
+  tm_shape(plots_sf) + tm_dots()
 
 # join state and county data to plot locations
 plots_comb <- left_join(plots_state, plots_county, by = c("Plot_Name"))
@@ -111,9 +113,9 @@ plots_comb2 <- left_join(plots_comb, fips_codes, by = c("state_name", "county"))
 head(plots_comb2)
 
 plots2 <- left_join(
-  plots |> select(Plot_Name, Network, ParkUnit, ParkSubUnit, Lat, Long, IsStuntedWoodland) |> unique(),
+  plots |> select(Plot_Name, Network, ParkUnit, ParkSubUnit, Lat, Long) |> unique(),
   plots_eco, by = "Plot_Name"
-) |> filter(IsStuntedWoodland == FALSE)
+)
 
 plots_final <- left_join(plots2, plots_comb2, by = c("Plot_Name", "ParkUnit")) |>
   select(plt_cn = Plot_Name, park = ParkUnit, parksubunit = ParkSubUnit,  network = Network,
@@ -121,18 +123,13 @@ plots_final <- left_join(plots2, plots_comb2, by = c("Plot_Name", "ParkUnit")) |
          countycd = county_code)
 
 head(plots_final)
-length(unique(plots_final$plt_cn)) #347 without stunted woodlands
 # This is the left df to join tree and sapling data to.
 
-#---- Compile NETN tree data ----
-trees <- joinTreeData(park = "all", from = 2006, to = 2024, status = 'active') |>
-  mutate(tree_id = paste0(Plot_Name, "-", sprintf("%03d", TagCode))) |>
+#---- Compile MIDN tree data ----
+trees <- joinTreeData(park = "all", from = 2007, to = 2024, status = 'active') |>
+  mutate(tree_id = paste0(Plot_Name, "-", sprintf("%06d", TagCode))) |>
   select(tree_id, Plot_Name, Network, ParkUnit, ParkSubUnit, SampleYear, cycle,
          TSN, ScientificName, Fork, DBHcm, TreeStatusCode, CrownClassCode, DecayClassCode, num_stems)
-
-# Drop 4 stunted woodlands, which are sampled at DRC and typically <5m tall.
-stunted <- joinLocEvent() |> filter(IsStuntedWoodland == TRUE) |>
-  select(Plot_Name) |> unique()
 
 # Fix unk tree where hardwood or conifer is known (legacy of old database)
 trees$ScientificName[trees$TSN == -9999999939] <- "Unknown Hardwood"
@@ -145,27 +142,26 @@ trees$ScientificName[trees$TSN == -9999999937] <- "Unknown species"
 trees$TSN[trees$TSN == -9999999937] <- -9999999950
 
 # Join USDA Plants Symbol and drop stunted woodland plots
-taxa <- VIEWS_NETN$Taxa_NETN[,c("TSN", "TaxonCode")]
+taxa <- VIEWS_MIDN_NCBN$Taxa_MIDN_NCBN[,c("TSN", "TaxonCode")]
 
-trees2 <- left_join(trees, taxa, by = "TSN") |>
-  filter(!Plot_Name %in% stunted$Plot_Name)
-
+trees2 <- left_join(trees, taxa, by = "TSN")
 # Species names missing SPCD b/c of synonyms
-  # Betula cordifolia; replace with Betula papyrifera; BEPA
-  # Betula X cearulea; replace with Betula papyrifera; BEPA
-  # Carya tomentosa: replace with Carya alba; CAAL27
-  # Quercus montana: replace with Quercus prinus; QUPR2
-trees2$TaxonCode[trees2$ScientificName == "Betula cordifolia"] <- "BEPA"
-trees2$TaxonCode[trees2$ScientificName == "Betula X cearulea"] <- "BEPA"
+# Acer floridanum; replace with Acer barbatum; ACBA3
+# Carya tomentosa: replace with Carya alba; CAAL27
+# Quercus (Red group): replace with Quercus; QUERC
+# Amelanchier canadensis: replace with Amelanchier spp. AMELA
+trees2$TaxonCode[trees2$ScientificName == "Acer floridanum"] <- "ACBA3"
+trees2$TaxonCode[trees2$ScientificName == "Amelanchier canadensis"] <- "AMELA"
 trees2$TaxonCode[trees2$ScientificName == "Carya tomentosa"] <- "CAAL27"
-trees2$TaxonCode[trees2$ScientificName == "Quercus montana"] <- "QUPR2"
+trees2$TaxonCode[trees2$ScientificName == "Quercus (Red group)"] <- "QUERC"
 
 # Join REF_SPECIES SPCD and JENKINS_SPGRPCD to tree data
 trees3 <- left_join(trees2, refspp, by = c("TaxonCode" = "SPECIES_SYMBOL"))
 trspp_na <- trees3 |> filter(is.na(SPCD)) |> select(ScientificName) |> unique()
 
 #----- Fix missing tree status and crown class codes -----
-source("compile_data_NETN_fix_missing_crownclasses.R")
+source("compile_data_MIDN_fix_missing_crownclasses.R")
+
 #----- Status -----
 # Drop Dead Fallen and Dead Cut trees and set up status codes
 live <- c("1", "AB", "AF", "AL", "AM", "AS", "RB", "RF", "RL", "RS")
@@ -182,12 +178,12 @@ trees4 <- trees3 |> filter(TreeStatusCode %in% c(live, dead)) |>
                                       TRUE ~ "unknown"))
 
 #---- Compile tree height ----
-  # Joining individual tree heights first for heights with tags.
-  # Then adding average codom and interm heights for trees not measured.
-  # For visits before intermediate heights were measured, will use the first visit with an intermediate height.
+# Joining individual tree heights first for heights with tags.
+# Then adding average codom and interm heights for trees not measured.
+# For visits before intermediate heights were measured, will use the first visit with an intermediate height.
 
 # Individual tree heights
-trht_ind <- VIEWS_NETN$StandTreeHeights_NETN |>
+trht_ind <- VIEWS_MIDN_NCBN$StandTreeHeights_MIDN_NCBN |>
   filter(!IsQAQC) |> filter(PlotTypeCode == "VS") |> filter(!IsAbandoned) |>
   mutate(tree_id = ifelse(!is.na(TagCode),
                           paste0(Plot_Name, "-", sprintf("%03d", TagCode)),
@@ -195,13 +191,32 @@ trht_ind <- VIEWS_NETN$StandTreeHeights_NETN |>
   select(tree_id, SampleYear, HEIGHT_IND = Height) |> filter(!is.na(tree_id)) |>
   mutate(htcd = 1) #1 = measured in the field
 
-trees5 <- left_join(trees4, trht_ind, by = c("tree_id", "SampleYear")) |>
-  filter(!Plot_Name %in% stunted$Plot_Name)
+trees5a <- left_join(trees4, trht_ind, by = c("tree_id", "SampleYear"))
+
+# Tree height wasn't sampled in 2007. Assigning the individual 2011 height if measured.
+trees07 <- trees5a |> filter(SampleYear == 2007)
+trees11 <- trees5a |> filter(SampleYear == 2011)
+
+trees07b <- left_join(trees07 |> select(-HEIGHT_IND),
+                      trees11 |> select(tree_id, HEIGHT_IND), by = "tree_id") |>
+  mutate(htcd = 4)
+
+trees5 <- rbind(trees5a |> filter(SampleYear > 2007), trees07b)
 
 # Stand level tree heights
-trht_avg <- joinStandData() |> select(Plot_Name, SampleYear, Avg_Height_Codom, Avg_Height_Inter)
+trht_avga <- joinStandData() |> select(Plot_Name, SampleYear, Avg_Height_Codom, Avg_Height_Inter)
 
-# Estimating tree heights from NETN Ecological Integrity SOP, page 158
+# Tree height wasn't sampled in 2007. Assigning the average 2011 heights.
+trht_avg07 <- trht_avga |> filter(SampleYear == 2007)
+trht_avg11 <- trht_avga |> filter(SampleYear == 2011)
+
+trht_avg07b <- left_join(trht_avg07 |> select(Plot_Name, SampleYear),
+                         trht_avg11 |> select(Plot_Name, Avg_Height_Codom, Avg_Height_Inter),
+                         by = "Plot_Name")
+
+trht_avg <- rbind(trht_avga |> filter(SampleYear > 2007), trht_avg07b)
+
+# Estimating tree heights from MIDN Ecological Integrity SOP, page 158
 treehts <- left_join(trees5, trht_avg, by = c("Plot_Name", "SampleYear")) |>
   mutate(ht =
            case_when(!is.na(HEIGHT_IND) ~ HEIGHT_IND,
@@ -211,12 +226,12 @@ treehts <- left_join(trees5, trht_avg, by = c("Plot_Name", "SampleYear")) |>
                      CrownClassCode == 4 & is.na(HEIGHT_IND) & !is.na(Avg_Height_Inter) ~ Avg_Height_Inter,
                      CrownClassCode == 4 & is.na(HEIGHT_IND) & is.na(Avg_Height_Inter) ~ Avg_Height_Codom * 0.8,
                      CrownClassCode %in% c(5, 6) ~ Avg_Height_Codom * 0.5 # subcanopy and gap exploiters
-                     )) |>
+           )) |>
   select(tree_id, Plot_Name, Network, ParkUnit, ParkSubUnit, SampleYear, cycle, ScientificName, usda_symbol = TaxonCode,
          SPCD, JENKINS_SPGRPCD, STATUSCD, STATUSclassifier, CrownClassCode, DBHcm, ht, htcd, decaycd = DecayClassCode)
 
 #----- Tricky heights to fix manually -----
-source("compile_data_NETN_fix_tree_heights.R")
+source("compile_data_MIDN_fix_tree_heights.R")
 
 # checking for missing live tree heights
 trhts_na <- treehts |> filter(is.na(ht)) |> filter(STATUSCD == "live") |>
@@ -224,6 +239,10 @@ trhts_na <- treehts |> filter(is.na(ht)) |> filter(STATUSCD == "live") |>
          CrownClassCode, ht)
 
 table(trhts_na$Plot_Name)
+
+trees_check <- trees3 |>
+  select(tree_id, Plot_Name, SampleYear, cycle, TreeStatusCode, CrownClassCode, DBHcm) |>
+  filter(tree_id %in% trhts_na$tree_id)
 
 tr_miss_dbh <- treehts |> filter(is.na(DBHcm)) |> filter(SampleYear == "live")
 tr_miss_dbh #none
@@ -262,26 +281,19 @@ tree_plots <- left_join(plots_final, tree6, by = c("plt_cn")) |>
          spcd, jenkins_spgrpcd, scientific_name, usda_symbol,
          statuscd, treeclcd,
          dbhcm, ht, htcd, cull, habit, decaycd)
-head(tree_plots)
-names(tree_plots)
 
-#---- Compile NETN sapling data ----
-saps <- joinMicroSaplings(park = "all", from = 2006, to = 2024) |>
-  arrange(Plot_Name, SampleYear, MicroplotCode, DBHcm) |>
-  group_by(Plot_Name) |>
-  mutate(sap_order = row_number(),
-         tree_id = paste0(Plot_Name, "-sap", sprintf("%03d", sap_order)),
-         TreeStatusCode = "live",
+#---- Compile MIDN sapling data ----
+saps <- joinMicroSaplings(park = "all", from = 2007, to = 2024) |>
+  arrange(Plot_Name, SampleYear, MicroplotCode, TagCode, SaplingStatusCode, DBHcm) |>
+  mutate(tree_id = paste0(Plot_Name, sprintf("%06d", TagCode)),
          CrownClassCode = 5,
-         DecayClassCode = NA_real_,
-         Fork = NA_character_) |>
-  ungroup() |>
+         DecayClassCode = NA_real_) |>
   select(tree_id, Plot_Name, Network, ParkUnit, ParkSubUnit, SampleYear, cycle,
-         TSN, ScientificName, Fork, DBHcm, TreeStatusCode, CrownClassCode, DecayClassCode,
+         TSN, ScientificName, Fork, DBHcm, SaplingStatusCode, CrownClassCode, DecayClassCode,
          num_stems = Count) |>
   filter(!ScientificName %in% c("Not Sampled", "None present"))
 
-sap_micros <- joinMicroSaplings(park = "all", from = 2006, to = 2024) |>
+sap_micros <- joinMicroSaplings(park = "all", from = 2007, to = 2024) |>
   filter(!ScientificName %in% c("Not Sampled")) |>
   select(Plot_Name, SampleYear, MicroplotCode) |> unique() |>
   group_by(Plot_Name, SampleYear) |>
@@ -291,28 +303,23 @@ table(sap_micros$num_micros, useNA = "always")
 
 saps2 <- left_join(saps, sap_micros, by = c("Plot_Name", "SampleYear"))
 
-# Fixing an unknown spp that is likely ACESAC based on other visits
-saps2$TSN[saps2$tree_id == "WEFA-001-sap009"] <- 28731
-saps2$ScientificName[saps2$tree_id == "WEFA-001-sap009"] <- "Acer saccharum"
-
 # Join USDA Plants Symbol and drop stunted woodland plots
-taxa <- VIEWS_NETN$Taxa_NETN[,c("TSN", "TaxonCode")]
+taxa <- VIEWS_MIDN_NCBN$Taxa_MIDN_NCBN[,c("TSN", "TaxonCode")]
 
-saps3 <- left_join(saps2, taxa, by = "TSN") |>
-  filter(!Plot_Name %in% stunted$Plot_Name)
+saps3 <- left_join(saps2, taxa, by = "TSN")
 
 # Species names missing SPCD b/c of synonyms
-# Betula cordifolia; replace with Betula papyrifera; BEPA
-# Betula X cearulea; replace with Betula papyrifera; BEPA
+# Acer floridanum; replace with Acer barbatum; ACBA3
 # Carya tomentosa: replace with Carya alba; CAAL27
-# Photinia villosa doesn't have a SPCD. The closest match is Photinia davidiana
-saps3$TaxonCode[saps3$ScientificName == "Betula cordifolia"] <- "BEPA"
-saps3$TaxonCode[saps3$ScientificName == "Betula X cearulea"] <- "BEPA"
+# Quercus (Red group): replace with Quercus; QUERC
+# Amelanchier canadensis: replace with Amelanchier spp. AMELA
+# Quercus montana: replace with Quercus prinus; QUPR2
+saps3$TaxonCode[saps3$ScientificName == "Acer floridanum"] <- "ACBA3"
+saps3$TaxonCode[saps3$ScientificName == "Amelanchier canadensis"] <- "AMELA"
 saps3$TaxonCode[saps3$ScientificName == "Carya tomentosa"] <- "CAAL27"
-saps3$TaxonCode[saps3$ScientificName == "Photinia villosa"] <- "PHDA5"
-
-saps3$ScientificName[saps3$TSN == -9999999937] <- "Unknown species"
-saps3$TSN[saps3$TSN == -9999999937] <- -9999999950
+saps3$TaxonCode[saps3$ScientificName == "Quercus (Red group)"] <- "QUERC"
+saps3$TaxonCode[saps3$ScientificName == "Quercus (White group)"] <- "QUERC"
+saps3$TaxonCode[saps3$ScientificName == "Quercus montana"] <- "QUPR2"
 
 table(saps3$TaxonCode, useNA = 'always') # 1 NA that's an unknown species
 
@@ -320,7 +327,7 @@ table(saps3$TaxonCode, useNA = 'always') # 1 NA that's an unknown species
 saps4 <- left_join(saps3, refspp, by = c("TaxonCode" = "SPECIES_SYMBOL"))
 sapspp_na <- saps4 |> filter(is.na(SPCD)) |> select(ScientificName)
 
-micro_size_m2 = 2*2*pi
+micro_size_m2 = 3*3*pi
 
 saps5 <- saps4 |> mutate(tpa_unadj = ((micro_size_m2 * num_micros)/4046.86)^-1,
                          ht = NA_real_,
@@ -331,7 +338,7 @@ saps5 <- saps4 |> mutate(tpa_unadj = ((micro_size_m2 * num_micros)/4046.86)^-1,
   select(plt_cn = Plot_Name, tre_cn = tree_id, network = Network, park = ParkUnit, parksubunit = ParkSubUnit,
          year = SampleYear, cycle, tpa_unadj,
          spcd = SPCD, jenkins_spgrpcd = JENKINS_SPGRPCD, scientific_name = ScientificName, usda_symbol = TaxonCode,
-         statuscd = TreeStatusCode, treeclcd = CrownClassCode,
+         statuscd = SaplingStatusCode, treeclcd = CrownClassCode,
          dbhcm = DBHcm, ht, htcd, cull, habit, decaycd = DecayClassCode)
 
 saps_plots <- right_join(plots_final, saps5, by = c("plt_cn", "park", "parksubunit", "network"))
@@ -341,7 +348,7 @@ setdiff(names(saps_plots), names(tree_plots))
 setdiff(names(tree_plots), names(saps_plots))
 
 #---- Bind tree and sapling data ----
-tree_sap <- rbind(tree_plots, saps_plots) |> filter(!plt_cn %in% stunted$Plot_Name)
+tree_sap <- rbind(tree_plots, saps_plots)
 # Update SPCD to use use 999 for unknown tree, 998 for unknown hardwood/broadleaf, and 299 for unknown conifer
 # based on REF_SPECIES.csv
 tree_sap$spcd[tree_sap$scientific_name == "Unknown species"] <- 999 #8
@@ -356,73 +363,20 @@ tree_sap$jenkins_spgrpcd[tree_sap$scientific_name == "Unknown Conifer"] <- 4
 # Add 0 to decay class for live trees, so NAs mean it wasn't recorded.
 tree_sap$decaycd[tree_sap$statuscd == "live"] <- 0
 
-length(unique(tree_sap$plt_cn)) #347
+length(unique(tree_sap$plt_cn)) #393
 
-write.csv(tree_sap, "./data/NETN_tree_sapling_data.csv", row.names = F)
+write.csv(tree_sap, "./data/MIDN_tree_sapling_data.csv", row.names = F)
 
 #---- Metadata for tree and sapling data ----
-meta <- data.frame(column_name = names(tree_sap),
-                   description = NA_character_,
-                   units = NA_character_,
-                   NETN = NA_character_)
+meta <- read.csv("./data/metadata_NETN.csv")
+meta$MIDN <- NA_character_
 
-meta$description[meta$column_name == "plt_cn"] <- "Unique plot identifier using 4-letter park code and 3-digit plot number"
-meta$units[meta$column_name == "plt_cn"] <- NA_character_
-meta$NETN[meta$column_name == "plt_cn"] <- "Plot numbers are unique to parks, but not the network"
-
-meta$description[meta$column_name == "tre_cn"] <- "Unique tree identifier using plot_cn and tree tag number"
-meta$units[meta$column_name == "tre_cn"] <- NA_character_
-meta$NETN[meta$column_name == "tre_cn"] <- "Tree tag numbers are unique to plots, but not the park or network. Saplings are not tagged, and are given a unique number based on when they were sampled. Sapling ids are therefore not linkable across time."
-
-meta$description[meta$column_name == "ecosubcd"] <- "Ecological subsection code"
-meta$description[meta$column_name == "ecodivision"] <- "Ecological subsection code"
-
-meta$description[meta$column_name == "year"] <- "Year plot was sampled, ranging from 2006-2024"
-
-meta$description[meta$column_name == "cycle"] <- "Number of times a plot has been visited"
-meta$units[meta$column_name == "cycle"] <- NA_character_
-meta$NETN[meta$column_name == "cycle"] <- "Plots are typically sampled on a 4-year rotation, with cycle 1 being 2006-2009. The sampling schedule was disrupted by COVID in 2020 and 2021, so that some parks/plots have 5 or 6 year intervals between visits."
-
-meta$description[meta$column_name == "tpa_unadj"] <- "Tree and sapling expansion factor for sampling area. Equates to 1/acres of sampling area."
-meta$units[meta$column_name == "tpa_unadj"] <- "1/acre"
-meta$NETN[meta$column_name == "tpa_unadj"] <- "In 2006, only 1 microplot was sampled for saplings. In 2007 and on, 3 microplots were sampled. The tpa_unadj reflects that change."
-
-meta$description[meta$column_name == "lat"] <- "Latitude of plot center in WGS84"
-meta$units[meta$column_name == "lat"] <- "decimal degrees"
-
-meta$description[meta$column_name == "long"] <- "Longitude of plot center in WGS84"
-meta$units[meta$column_name == "long"] <- "decimal degrees"
-
-meta$description[meta$column_name == "network"] <- "4-letter network code"
-meta$description[meta$column_name == "park"] <- "4-letter park code"
-meta$description[meta$column_name == "parksubunit"] <- "Subunit within a park as potential grouping variable."
-meta$description[meta$column_name == "state_name"] <- "State park occurs in."
-meta$description[meta$column_name == "statecd"] <- "State FIPS code"
-meta$description[meta$column_name == "countycd"] <- "County FIPS code"
-meta$description[meta$column_name == "spcd"] <- "Species code used by FIA taken from REF_SPECIES. When a species code doesn't exist, code is NA."
-meta$description[meta$column_name == "jenkins_spgrpcd"] <- "Jenkins species group used by FIA and taken from REF_SPECIES"
-meta$description[meta$column_name == "scientific_name"] <- "Latin name"
-meta$description[meta$column_name == "usda_symbol"] <- "USDA Plants Symbol"
-meta$description[meta$column_name == "statuscd"] <- "Tree status: dead or live"
-
-meta$description[meta$column_name == "treeclcd"] <- "Crown class of tree. 1 = open grown; 2 = dominant; 3 = codominant; 4 = intermediate; 5 = subcanopy; 6 = gap exploiter"
-meta$NETN[meta$column_name == "treecld"] <- "Gap exploiter is either an intermediate or subcanopy tree expected to grow faster than normal because it is within a canopy gap."
-
-meta$description[meta$column_name == "dbhcm"] <- "DBH of tree or sapling."
-meta$units[meta$column_name == "dbhcm"] <- "cm"
-
-meta$description[meta$column_name == "ht"] <- "Height of tree"
-meta$units[meta$column_name == "ht"] <- "meters"
-
-meta$description[meta$column_name == "htcd"] <- "Indicates how tree height was assigned. 1 = the individual tree was measured for tree height. 4 = the height was derived."
-
-meta$description[meta$column_name == "cull"] <- "Percent of wood considered cull from 0 to 1 based on recorded tree conditions."
-
-meta$description[meta$column_name == "habit"] <- "Denotes if stem is a tree or sapling. Trees are defined as 1) any live stem >=10cm DBH regardless of whether it is standing, leaning or fallen, or 2) any dead stem >= 10cm DBH that is standing or leaning. Saplings are stems >= 1cm DBH and <10cm DBH and are only measured if live."
-meta$NETN[meta$column_name == "habit"] <- "Individual saplings are not tracked over time, and sometimes are missed across years because crews because QA/QC isn't as strict as with trees."
-
-meta$description[meta$column_name == "decaycd"] <- "FIA decay class for snags ranging from 1-5. Live trees are given a code of 0. Dead trees with missing decay classes are NA"
-write.csv(meta, "./data/metadata_NETN.csv", row.names = F)
+meta$MIDN[meta$column_name == "plt_cn"] <- "Plot numbers are unique to MIDN"
+meta$MIDN[meta$column_name == "tre_cn"] <- "Tree tag numbers are unique to MIDN; Saplings are not tagged and can be linked across time, including when saplings grow into tree size (they have the same tag number)."
+meta$MIDN[meta$column_name == "cycle"] <- "Plots are typically sampled on a 4-year rotation, with cycle 1 being 2007-2010 for MIDN parks, 2008-2011 for GEWA & THST, 2011-2014 for COLO, and 2019-2024 for ASIS. The sampling schedule was disrupted by COVID in 2020 and 2021, so that some parks/plots have 5 or 6 year intervals between visits."
+meta$MIDN[meta$column_name == "treecld"] <- "Gap exploiter is either an intermediate or subcanopy tree expected to grow faster than normal because it is within a canopy gap."
+meta$MIDN[meta$column_name == "habit"] <- "Individual saplings are tracked over time the same as trees, although crown class, heights and decay class are not recorded for saplings."
+write.csv(meta, "./data/metadata_NETN_MIDN.csv", row.names = F)
 
 
 
