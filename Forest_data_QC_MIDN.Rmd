@@ -1,0 +1,235 @@
+---
+output:
+  html_document:
+    css: www/styles.css
+    anchor_sections: FALSE
+params:
+  file: "MIDN_tree_sapling_data.csv"
+---
+
+```{r setup, include = F}
+knitr::opts_chunk$set(echo = FALSE, vline = "|")
+options(knitr.kable.NA = '', scipen = 100)
+```
+
+```{r, results = 'hide', warning=FALSE, message=FALSE}
+library(tidyverse)
+#library(rstatix) # for outlier detection
+library(knitr)
+library(kableExtra)
+#dat <- read.csv("./data/MIDN_tree_sapling_data.csv")
+dat <- read.csv(paste0("./data/", params$file))
+```
+
+## MIDN QC {.tabset}
+
+### Tree Heights {.tabset}
+Checking height codes that vary more than 10% among years within the same plot. MIDN methods changed over time (see below), so a bit tricky to QC. 
+
+History of tree height in MIDN:
+* 2007: tree height not sampled- used 2011 values
+* 2008: Only measured height of one codominant tree per plot, and didn't record tree tag.
+* 2009-2010: Started measuring 3 codominant trees per plot, but didn't record tree tags.
+* 2011: Began recording tree tag of measured trees. 
+* 2013 and later: Started measuring tree height on 3 intermediate trees in addition to 3 codominant trees. 
+
+There aren't nearly as many rogue values as NETN. Wondering if it's because MIDN used hypsometer from the beginning, and possibly that canopy heights are more uniform across plots/parks (ie crews get used to recording a range of numbers). Heights from the first cycle do tend to be the cycle with outliers, like with NETN.
+
+```{r results = 'hide'}
+hts <- 
+  rbind(dat |> filter(year > 2007 & year < 2011) |> filter(treeclcd == 3) |> select(park, plt_cn, year, cycle, treeclcd, ht) |> unique(), # early data
+        dat |> filter(year >= 2011) |> filter(htcd == 1) |> select(park, plt_cn, year, cycle, treeclcd, ht) |> unique() # latest protocol data
+        ) |> filter(!is.na(ht)) |> filter(treeclcd %in% c(3, 4))
+
+# hts_out <- hts |> group_by(park, plt_cn, treeclcd) |> identify_outliers(ht) |> 
+#   mutate(outlier_cycle = cycle) |> filter(is.extreme == TRUE) |> 
+#   select(park, plt_cn, treeclcd, cycle, ht, outlier_cycle) 
+
+table(dat$htcd, dat$treeclcd)
+
+hts_out <- hts |> group_by(park, plt_cn, treeclcd) |> 
+  summarize(ht_max = quantile(ht, probs = 0.99, na.rm = T), 
+            ht_min = quantile(ht, probs = 0.01, na.rm = T), 
+            .groups = 'drop')
+
+hts_sum <- hts |> group_by(park, plt_cn, cycle, treeclcd) |> 
+  filter(treeclcd %in% c(3,4)) |> # remove a couple rogue tree heights for other crown classes
+  summarize(hts_avg = round(mean(ht), 2), .groups = 'drop')
+
+hts_join <- left_join(hts_sum, hts_out, by = c("park", "plt_cn", "treeclcd"))
+head(hts_join)
+
+table(hts_join$cycle)
+
+hts_wide <- hts_join |> unique() |> 
+  arrange(plt_cn, cycle, treeclcd) |> 
+  pivot_wider(names_from = cycle, 
+              values_from = hts_avg, 
+              names_prefix = "c") |> 
+  select(park, plt_cn, treeclcd, ht_max, ht_min, c1, c2, c3, c4, c5) |> 
+  mutate(across(c1:c5, 
+                ~ifelse(.x < ht_min, "low", ifelse(.x > ht_max, "high", NA_character_)),
+                .names = "{.col}_out")) |> 
+  filter(if_any(c1_out:c5_out, ~!is.na(.))) |> 
+  mutate(crown_class = case_when(treeclcd == 3 ~ 'codom',
+                                 treeclcd == 4 ~ 'inter',
+                                 TRUE ~ NA_character_)) |> 
+  arrange(crown_class, plt_cn) 
+
+head(hts_wide)
+# no outliears in c2-4
+ht_kbl <- kable(hts_wide |> select(plt_cn, crown_class, c1:c5), format = 'html', align = 'c',
+                col.names = c("Plot", "Crown Class", paste0("C", 1:5, " height")),
+                caption = "Tree heights outside of 99% quantile within a plot and crown class. Values are tree heights measured in meters. Red are high and blue are low outliers") |> 
+  kable_styling(fixed_thead = T, bootstrap_options = c('condensed'), full_width = F, position = 'center') |> 
+  column_spec(1:7, border_left = "1px solid grey", border_right = "1px solid grey") |> 
+  column_spec(3, background = ifelse(hts_wide$c1_out %in% "high", "#eaafaf",
+                                     ifelse(hts_wide$c1_out %in% "low", "#AFC0EA", "white"))) |> 
+  column_spec(4, background = ifelse(hts_wide$c2_out %in% "high", "#eaafaf",
+                                     ifelse(hts_wide$c2_out %in% "low", "#AFC0EA", "white"))) |> 
+  column_spec(5, background = ifelse(hts_wide$c3_out %in% "high", "#eaafaf",
+                                     ifelse(hts_wide$c3_out %in% "low", "#AFC0EA", "white"))) |> 
+  column_spec(6, background = ifelse(hts_wide$c4_out %in% "high", "#eaafaf",
+                                     ifelse(hts_wide$c4_out %in% "low", "#AFC0EA", "white"))) |> 
+  column_spec(7, background = ifelse(hts_wide$c5_out %in% "high", "#eaafaf",
+                                     ifelse(hts_wide$c5_out %in% "low", "#AFC0EA", "white")))
+```
+
+```{r include = F}
+head(hts_join)
+hts_out2 <- hts_join |> mutate(outlier = ifelse(hts_avg > ht_max, "high", ifelse(hts_avg < ht_min, "low", NA_character_))) |> 
+  filter(treeclcd == 3)
+head(hts_wide)
+codom_outs <- unique(hts_wide$plt_cn[hts_wide$crown_class == "codom"])
+
+head(hts_out2)
+midn <- c("APCO", "BOWA", "FRSP", "GETT", "HOFU", "PETE", "RICH", "VAFO")
+midn <- ggplot(hts_out2 |> filter(plt_cn %in% codom_outs) |> filter(park %in% midn), 
+               aes(x = cycle, y = hts_avg)) +
+        geom_line() + facet_wrap(~plt_cn) + theme_bw() +
+        labs(x = "Cycle", y = "Tree Ht (m)") +
+        theme(strip.text = element_text(size = 7))
+
+ncbn <- ggplot(hts_out2 |> filter(plt_cn %in% codom_outs) |> filter(!park %in% midn), 
+               aes(x = cycle, y = hts_avg)) +
+       geom_line() + facet_wrap(~plt_cn) + theme_bw() +
+        labs(x = "Cycle", y = "Tree Ht (m)") +
+        theme(strip.text = element_text(size = 7))
+
+```
+
+
+```{r results = 'hide'}
+#Trying to better identify the big swings by comparing value to +/- 25% of median
+hts_med <- hts |> group_by(park, plt_cn, treeclcd) |> 
+  summarize(ht_med = median(ht, na.rm = T),
+            ht_p25 = ht_med*1.25,
+            ht_m25 = ht_med*0.25, 
+            .groups = 'drop')
+
+hts_join2 <- left_join(hts_sum, hts_med, by = c("park", "plt_cn", "treeclcd")) 
+head(hts_join2)
+
+hts_wide2 <- hts_join2 |> unique() |> 
+  pivot_wider(names_from = cycle, 
+              values_from = hts_avg, 
+              names_prefix = "c") |> 
+  arrange(plt_cn, treeclcd) |> 
+  mutate(across(c1:c5, 
+                ~ifelse(.x < ht_m25, "low", ifelse(.x > ht_p25, "high", NA_character_)),
+                .names = "{.col}_out")) |> 
+  filter(if_any(c1_out:c5_out, ~!is.na(.))) |> 
+  mutate(crown_class = case_when(treeclcd == 3 ~ 'codom',
+                                 treeclcd == 4 ~ 'inter',
+                                 TRUE ~ NA_character_)) |> 
+  arrange(crown_class, plt_cn)
+
+head(hts_wide2)
+
+codom_outs2 <- unique(hts_wide2$plt_cn[hts_wide2$crown_class == "codom"])
+
+head(hts_out2)
+
+outs50 <- ggplot(hts_out2 |> filter(plt_cn %in% codom_outs2), 
+                 aes(x = cycle, y = hts_avg)) +
+          geom_line() + facet_wrap(~plt_cn) + theme_bw() +
+          labs(x = "Cycle", y = "Tree Ht (m)") +
+          theme(strip.text = element_text(size = 7))
+
+```
+
+#### Outliers +/- 25%
+MIDN/NCBN plots with at least 1 identified outlier (+/- 25% of median) for codominant trees. 
+```{r fig.height = 10, out.width = '100%'}
+outs50
+```
+
+#### Outlier Table
+
+```{r}
+ht_kbl
+```
+
+
+#### MIDN less extreme outs
+MIDN plots with at least 1 identified outlier for codominant trees as being outside 99% quantile of heights measured within a given plot. 
+```{r fig.height = 10, out.width = '100%'}
+midn
+```
+
+#### NCBN less extreme outs
+NCBN plots with at least 1 identified outlier for codominant trees as being outside 99% quantile of heights measured within a given plot.
+```{r fig.height = 10, out.width = '100%'}
+ncbn
+```
+
+### Tree measurements
+#### Swings in DBH
+```{r results = 'hide'}
+dbh1 <- dat |> select(park, plt_cn, tre_cn, cycle, treeclcd, dbhcm) |> 
+  pivot_wider(names_from = cycle, values_from = dbhcm, names_prefix = "c")
+
+dbhstat <- dat |> select(park, plt_cn, tre_cn, cycle, treeclcd, statuscd) |> 
+  pivot_wider(names_from = cycle, values_from = statuscd, names_prefix = "status_c")
+
+dbh <- full_join(dbh1, dbhstat, by = c("park", "plt_cn", "tre_cn", "treeclcd"))
+
+dbh$c12_dif = dbh$c2 - dbh$c1
+dbh$c23_dif = dbh$c3 - dbh$c2
+dbh$c34_dif = dbh$c4 - dbh$c3
+dbh$c45_dif = dbh$c5 - dbh$c4
+
+dbh$c12_out = ifelse(dbh$c12_dif > 4, "high", ifelse(dbh$c12_dif < -0.5, "low", NA_character_))
+dbh$c23_out = ifelse(dbh$c23_dif > 4, "high", ifelse(dbh$c23_dif < -0.5, "low", NA_character_))
+dbh$c34_out = ifelse(dbh$c34_dif > 4, "high", ifelse(dbh$c34_dif < -0.5, "low", NA_character_))
+dbh$c45_out = ifelse(dbh$c45_dif > 4, "high", ifelse(dbh$c45_dif < -0.5, "low", NA_character_))
+
+dbh_out <- dbh |> filter(if_any(c(c12_out, c23_out, c34_out, c45_out), ~!is.na(.))) |> data.frame() |> 
+  filter(!if_any(c(status_c1, status_c2, status_c3, status_c4, status_c5), ~.x=='dead'))
+head(dbh_out)
+
+dbh_kbl <- kable(dbh_out |> select(plt_cn, treeclcd, c1:c5), format = 'html', align = 'c',
+                col.names = c("Plot", "Crown Class", paste0("C", 1:5, " height")),
+                caption = "DBH measurements >4cm DBH or <-0.5cm DBH of previous measurement for live trees only. Red are high and blue are low outliers") |> 
+  kable_styling(fixed_thead = T, bootstrap_options = c('condensed'), full_width = F, position = 'center') |> 
+  column_spec(1:7, border_left = "1px solid grey", border_right = "1px solid grey") |> 
+  column_spec(4, background = ifelse(dbh_out$c12_out %in% "high", "#eaafaf",
+                                     ifelse(dbh_out$c12_out %in% "low", "#AFC0EA", "white"))) |> 
+  column_spec(5, background = ifelse(dbh_out$c23_out %in% "high", "#eaafaf",
+                                     ifelse(dbh_out$c23_out %in% "low", "#AFC0EA", "white"))) |> 
+  column_spec(6, background = ifelse(dbh_out$c34_out %in% "high", "#eaafaf",
+                                     ifelse(dbh_out$c34_out %in% "low", "#AFC0EA", "white"))) |> 
+  column_spec(7, background = ifelse(dbh_out$c45_out %in% "high", "#eaafaf",
+                                     ifelse(dbh_out$c45_out %in% "low", "#AFC0EA", "white"))) 
+```
+
+
+```{r}
+dbh_kbl
+```
+
+
+#### Zombie trees
+
+
+#### Spp Changes
