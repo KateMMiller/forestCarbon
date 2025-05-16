@@ -231,5 +231,16 @@ dbh_kbl
 
 #### Zombie trees
 
+```{r}
+head(dbh_out)
+dbh_zomb <- dbh |> select(park, plt_cn, tre_cn, status_c1, status_c2, status_c3, status_c4, status_c5) |> 
+  mutate(zombie = ifelse(status_c1 == "dead" & status_c2 == "live" | 
+                         status_c2 == "dead" & status_c3 == "live" | 
+                         status_c3 == "dead" & status_c4 == "live" |
+                         status_c4 == "dead" & status_c5 == "live", 
+                         "zombie", NA_character_)) |> 
+  filter(zombie == "zombie")
+
+```
 
 #### Spp Changes
