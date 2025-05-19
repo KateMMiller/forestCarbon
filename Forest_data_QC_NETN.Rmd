@@ -248,3 +248,28 @@ zomb_kbl
 ```
 
 #### Spp Changes
+```{r}
+head(dat)
+
+sppchg1 <- dat |> group_by(park, plt_cn, tre_cn, cycle) |> summarize(sppchg = length(unique(usda_symbol)), .groups = 'drop') |> 
+  filter(sppchg > 1) 
+sppchg2 <- left_join(sppchg1 |> select(-sppchg), dat |> select(tre_cn, cycle, scientific_name), by = c("tre_cn", "cycle")) |> 
+  pivot_wider(names_from = cycle, values_from = scientific_name, names_prefix = "c")
+
+head(sppchg2)
+
+sppchg_kbl <- 
+  if(nrow(sppchg2) > 0){
+  kable(sppchg2 , format = 'html', align = 'c', col.names = c("Park", "Plot", "Tree", paste0("status_c", 1:5)), 
+        caption = "Tree species name changes.") |> 
+       kable_styling(fixed_thead = T, bootstrap_options = c('condensed'), full_width = F, position = 'center') |> 
+  column_spec(1:8, border_left = "1px solid grey", border_right = "1px solid grey")
+
+  } else {"No tree species names changes in dataset."}
+
+```
+
+```{r}
+sppchg_kbl
+```
+
