@@ -64,17 +64,18 @@ hts_wide <- hts_join |> unique() |>
   mutate(across(c1:c5, 
                 ~ifelse(.x < ht_min, "low", ifelse(.x > ht_max, "high", NA_character_)),
                 .names = "{.col}_out")) |> 
-  filter(if_any(c1_out:c5_out, ~!is.na(.))) |> 
+ #filter(if_any(c1_out:c5_out, ~!is.na(.))) |> 
   mutate(crown_class = case_when(treeclcd == 3 ~ 'codom',
                                  treeclcd == 4 ~ 'inter',
-                                 TRUE ~ NA_character_)) |> 
-  arrange(crown_class, plt_cn)
+                                 TRUE ~ NA_character_),
+         outlier = ifelse(if_any(c1_out:c5_out, ~!is.na(.)), "X", NA_character_)) |> 
+  arrange(outlier, crown_class, plt_cn)
 
 #head(hts_wide)
 
-ht_kbl <- kable(hts_wide |> select(plt_cn, crown_class, c1:c5), format = 'html', align = 'c',
+ht_kbl <- kable(hts_wide |> select(plt_cn, crown_class, c1, c2, c3, c4, c5), format = 'html', align = 'c',
                 col.names = c("Plot", "Crown Class", paste0("C", 1:5, " height")),
-                caption = "Tree heights outside of 99% quantile within a plot and crown class. Values are tree heights measured in meters. Red are high and blue are low outliers") |> 
+                caption = "Tree heights outside of 99% quantile within a plot and crown class. Values are tree heights measured in meters. Outliers are represented with red as high and blue as low outliers.") |> 
   kable_styling(fixed_thead = T, bootstrap_options = c('condensed'), full_width = F, position = 'center') |> 
   column_spec(1:7, border_left = "1px solid grey", border_right = "1px solid grey") |> 
   column_spec(3, background = ifelse(hts_wide$c1_out %in% "high", "#eaafaf",
@@ -94,7 +95,7 @@ head(hts_join)
 hts_out2 <- hts_join |> mutate(outlier = ifelse(hts_avg > ht_max, "high", ifelse(hts_avg < ht_min, "low", NA_character_))) |> 
   filter(treeclcd == 3)
 head(hts_wide)
-codom_outs <- unique(hts_wide$plt_cn[hts_wide$crown_class == "codom"])
+codom_outs <- unique(hts_wide$plt_cn[hts_wide$crown_class == "codom" & !is.na(hts_wide$outlier)])
 
 head(hts_out2)
 
@@ -102,13 +103,13 @@ acad <- ggplot(hts_out2 |> filter(plt_cn %in% codom_outs) |> filter(park == "ACA
                aes(x = cycle, y = hts_avg)) +
         geom_line() + facet_wrap(~plt_cn) + theme_bw() +
         labs(x = "Cycle", y = "Tree Ht (m)") +
-        theme(strip.text = element_text(size = 7))
+        theme(strip.text = element_text(size = 6))
 
 nhp <- ggplot(hts_out2 |> filter(plt_cn %in% codom_outs) |> filter(!park == "ACAD"), 
                aes(x = cycle, y = hts_avg)) +
        geom_line() + facet_wrap(~plt_cn) + theme_bw() +
         labs(x = "Cycle", y = "Tree Ht (m)") +
-        theme(strip.text = element_text(size = 7))
+        theme(strip.text = element_text(size = 6))
 
 ```
 
@@ -154,12 +155,11 @@ outs50 <- ggplot(hts_out2 |> filter(plt_cn %in% codom_outs2),
 
 #### Outliers +/- 50%
 NETN plots with at least 1 identified outlier (+/- 50% of median) for codominant trees. 
-```{r fig.height = 10, out.width = '100%'}
+```{r fig.height = 10, out.width = '100%', warning = F, message = F}
 outs50
 ```
 
-#### Outlier Table
-
+#### Stand Height Table
 ```{r}
 ht_kbl
 ```
@@ -167,13 +167,13 @@ ht_kbl
 
 #### ACAD less extreme outs
 ACAD plots with at least 1 identified outlier for codominant trees as being outside 99% quantile of heights measured within a given plot.
-```{r fig.height = 10, out.width = '100%'}
+```{r fig.height = 10, out.width = '110%', warning = F, message = F}
 acad
 ```
 
 #### NHP less extreme outs
 Non-ACAD (National Historic Parks) plots with at least 1 identified outlier for codominant trees as being outside 99% quantile of heights measured within a given plot.
-```{r fig.height = 10, out.width = '100%'}
+```{r fig.height = 10, out.width = '110%', warning = F, message = F}
 nhp
 ```
 
@@ -202,9 +202,10 @@ dbh_out <- dbh |> filter(if_any(c(c12_out, c23_out, c34_out, c45_out), ~!is.na(.
   filter(!if_any(c(status_c1, status_c2, status_c3, status_c4, status_c5), ~.x=='dead'))
 head(dbh_out)
 
-dbh_kbl <- kable(dbh_out |> select(plt_cn, treeclcd, c1:c5), format = 'html', align = 'c',
-                col.names = c("Plot", "Crown Class", paste0("C", 1:5, " height")),
-                caption = "DBH measurements >4cm DBH or <-0.5cm DBH of previous measurement for live trees only. Red are high and blue are low outliers") |> 
+#dbh_kbl <- kable(dbh_out |> select(plt_cn, treeclcd, c1:c5), format = 'html', align = 'c',
+dbh_kbl <- kable(dbh_out |> select(plt_cn, treeclcd, c1, c2, c3, c4, c5), format = 'html', align = 'c',
+                col.names = c("Plot", "Crown Class", paste0("C", 1:5, " dbh")),
+                caption = "DBH measurements for all trees over time. Trees with >4cm DBH of previous measurement are red. Trees that shrank more than 0.5cm from previous DBH measurement are blue.") |> 
   kable_styling(fixed_thead = T, bootstrap_options = c('condensed'), full_width = F, position = 'center') |> 
   column_spec(1:7, border_left = "1px solid grey", border_right = "1px solid grey") |> 
   column_spec(4, background = ifelse(dbh_out$c12_out %in% "high", "#eaafaf",
@@ -248,7 +249,7 @@ zomb_kbl
 ```
 
 #### Spp Changes
-```{r}
+```{r results = 'hide'}
 head(dat)
 
 sppchg1 <- dat |> group_by(park, plt_cn, tre_cn, cycle) |> summarize(sppchg = length(unique(usda_symbol)), .groups = 'drop') |> 
@@ -257,7 +258,7 @@ sppchg2 <- left_join(sppchg1 |> select(-sppchg), dat |> select(tre_cn, cycle, sc
   pivot_wider(names_from = cycle, values_from = scientific_name, names_prefix = "c")
 
 head(sppchg2)
-
+c
 sppchg_kbl <- 
   if(nrow(sppchg2) > 0){
   kable(sppchg2 , format = 'html', align = 'c', col.names = c("Park", "Plot", "Tree", paste0("status_c", 1:5)), 
