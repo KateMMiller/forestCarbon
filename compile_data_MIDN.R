@@ -13,7 +13,7 @@ library(tmap) # to check plots vs ecoregion layers
 #remotes::install_github('r-tmap/tmap')
 
 # import latest MIDN data.
-importCSV(path = "./data/", zip_name = "MIDN_NCBN_Forest_20241106.zip")
+importCSV(path = "./data/", zip_name = "records-2306436.zip")
 
 #---- Download and compile external data -----
 # Download FIA REF_SPECIES.csv to get SPCD
@@ -99,8 +99,6 @@ plots_county <- st_join(plots_sf, us_county, left = T) |>
   st_drop_geometry()
 
 # Check that plots are showing up in right place
-tmap_options(max.categories = 37) # b/c 37 provinces
-
 tm_shape(ecoprov, bbox = plots_sf) + tm_fill("MAP_UNIT_S") +
   tm_shape(us_county) + tm_borders() +
   tm_shape(us_states) + tm_borders(lwd = 1.5) +
@@ -186,7 +184,7 @@ trees4 <- trees3 |> filter(TreeStatusCode %in% c(live, dead)) |>
 trht_ind <- VIEWS_MIDN_NCBN$StandTreeHeights_MIDN_NCBN |>
   filter(!IsQAQC) |> filter(PlotTypeCode == "VS") |> filter(!IsAbandoned) |>
   mutate(tree_id = ifelse(!is.na(TagCode),
-                          paste0(Plot_Name, "-", sprintf("%03d", TagCode)),
+                          paste0(Plot_Name, "-", sprintf("%06d", TagCode)),
                           NA_character_)) |>
   select(tree_id, SampleYear, HEIGHT_IND = Height) |> filter(!is.na(tree_id)) |>
   mutate(htcd = 1) #1 = measured in the field
@@ -202,6 +200,7 @@ trees07b <- left_join(trees07 |> select(-HEIGHT_IND),
   mutate(htcd = 4)
 
 trees5 <- rbind(trees5a |> filter(SampleYear > 2007), trees07b)
+table(trees5$htcd)
 
 # Stand level tree heights
 trht_avga <- joinStandData() |> select(Plot_Name, SampleYear, Avg_Height_Codom, Avg_Height_Inter)
