@@ -190,8 +190,9 @@ NCBN plots with at least 1 identified outlier for codominant trees as being outs
 ncbn
 ```
 
-### Tree measurements
-#### Swings in DBH
+### Tree measurements {.tabset}
+#### Swings in DBH {.tabset}
+
 ```{r results = 'hide'}
 dbh1 <- dat |> select(park, plt_cn, tre_cn, cycle, treeclcd, dbhcm) |> 
   pivot_wider(names_from = cycle, values_from = dbhcm, names_prefix = "c")
@@ -237,7 +238,8 @@ dbh_kbl
 ```
 
 
-#### Zombie trees
+#### Zombie trees {.tabset}
+
 ```{r results = 'hide'}
 head(dbh_out)
 dbh_zomb <- dbh |> select(park, plt_cn, tre_cn, status_c1, status_c2, status_c3, status_c4, status_c5) |> 
@@ -263,7 +265,8 @@ zomb_kbl <-
 zomb_kbl
 ```
 
-#### Spp Changes
+#### Spp Changes {.tabset}
+
 ```{r results = 'hide'}
 head(dat)
 
