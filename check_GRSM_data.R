@@ -7,6 +7,17 @@ library(tidycensus) # for FIPS state/county codes
 library(tmap) # to check plots vs ecoregion layers
 
 grsm <- read.csv("./data/GRSM_Carbon_Project_20250512.csv")
+
+grsm$statecd <- substr(grsm$statecd, 4, 5)
+table(grsm$statecd)
+grsm$countycd <- substr(grsm$countycd, 6, 8)
+table(grsm$countycd)
+
+write.csv(grsm, "./data/GRSM_tree_sapling_data.csv")
+
+#----------------------------
+# Code below ended up not being needed, after I figured out the pattern to the original FIPS codes.
+
 netn <- read.csv("./data/NETN_tree_sapling_data.csv")
 setdiff(names(grsm), names(netn))
 setdiff(names(netn), names(grsm))
@@ -23,6 +34,9 @@ us_states <- geoboundaries("USA", "adm1")
 us_county <- geoboundaries("USA", "adm2")
 plots_state <- st_join(plots_sf, us_states, left = T) |> select(plt_cn, state_name = shapeName) |>
   st_drop_geometry()
+
+table(grsm$statecd)
+table(grsm$countycd)
 
 plots_county <- st_join(plots_sf, us_county, left = T) |>
   mutate(county = paste0(shapeName, " County")) |>
