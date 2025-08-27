@@ -247,7 +247,7 @@ tr_miss_dbh <- treehts |> filter(is.na(DBHcm)) |> filter(SampleYear == "live")
 tr_miss_dbh #none
 
 #----- CULL -----
-treecond1 <- joinTreeConditions() |> mutate(tree_id = paste0(Plot_Name, "-", sprintf("%03d", TagCode))) |>
+treecond1 <- joinTreeConditions() |> mutate(tree_id = paste0(Plot_Name, "-", sprintf("%06d", TagCode))) |>
   select(tree_id, SampleYear, AD, CAVL, CAVS, DBT)
 
 treecond1$AD[is.na(treecond1$AD)] <- 0
@@ -263,7 +263,7 @@ treecond <- left_join(treehts, treecond1, by = c("tree_id", "SampleYear")) |>
          CULL_DBT = ifelse(AD == 0 & DBT == 1, 0.1, 0),
          cull = CULL_br + CULL_AD + CULL_CAVL + CULL_CAVS + CULL_DBT,
          habit = "Tree",
-         tpa_unadj = ifelse(ParkUnit == "ACAD", (225/4046.86)^-1, (400/4046.86)^-1))
+         tpa_unadj = (400/4046.86)^-1)
 
 treecond$htcd[is.na(treecond$htcd) & !is.na(treecond$ht)] <- 4
 
@@ -291,6 +291,7 @@ saps <- joinMicroSaplings(park = "all", from = 2007, to = 2024) |>
          TSN, ScientificName, Fork, DBHcm, SaplingStatusCode, CrownClassCode, DecayClassCode,
          num_stems = Count) |>
   filter(!ScientificName %in% c("Not Sampled", "None present"))
+
 
 sap_micros <- joinMicroSaplings(park = "all", from = 2007, to = 2024) |>
   filter(!ScientificName %in% c("Not Sampled")) |>
@@ -343,11 +344,19 @@ saps5 <- saps4 |> mutate(tpa_unadj = ((micro_size_m2 * num_micros)/4046.86)^-1,
 saps_plots <- right_join(plots_final, saps5, by = c("plt_cn", "park", "parksubunit", "network"))
 head(data.frame(saps_plots))
 
-setdiff(names(saps_plots), names(tree_plots))
-setdiff(names(tree_plots), names(saps_plots))
+# Drop dead trees and simplify status
+# Drop Dead Fallen and Dead Cut trees and set up status codes
+live <- c("1", "AB", "AF", "AL", "AM", "AS", "RB", "RF", "RL", "RS")
+dead <- c("2", "DB", "DL", "DM", "DS")
+
+saps_plots1 <- saps_plots |> mutate(statuscd = ifelse(statuscd %in% live, "live", "other")) |>
+  filter(statuscd == 'live')
+
+setdiff(names(saps_plots1), names(tree_plots))
+setdiff(names(tree_plots), names(saps_plots1))
 
 #---- Bind tree and sapling data ----
-tree_sap <- rbind(tree_plots, saps_plots)
+tree_sap <- rbind(tree_plots, saps_plots1)
 # Update SPCD to use use 999 for unknown tree, 998 for unknown hardwood/broadleaf, and 299 for unknown conifer
 # based on REF_SPECIES.csv
 tree_sap$spcd[tree_sap$scientific_name == "Unknown species"] <- 999 #8
@@ -363,6 +372,16 @@ tree_sap$jenkins_spgrpcd[tree_sap$scientific_name == "Unknown Conifer"] <- 4
 tree_sap$decaycd[tree_sap$statuscd == "live"] <- 0
 
 length(unique(tree_sap$plt_cn)) #393
+
+table(tree_sap$habit, tree_sap$statuscd)
+tree_sap$treeclcd[tree_sap$treeclcd == 6] <- 4
+nrow(tree_sap |> filter(ht == 0))
+nrow(tree_sap |> filter(!is.na(ht)))
+nrow(tree_sap |> filter(is.na(ht)))
+tree_sap$ht[tree_sap$ht == 0] <- NA_real_
+
+# Deleting bad height data in 2009 for APCO-178
+tree_sap$ht[tree_sap$plt_cn == "APCO-178" & tree_sap$year == 2009] <- NA_real_
 
 write.csv(tree_sap, "./data/MIDN_tree_sapling_data.csv", row.names = F)
 

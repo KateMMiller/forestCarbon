@@ -6,6 +6,8 @@
 library(forestNETN) # can be installed via: devtools::install_github("katemmiller/forestNETN")
 library(tidyverse)
 library(sf)
+#install.packages('hoardr') #dependency for rgeoboundaries
+#devtools::install_github("wmgeolab/rgeoboundaries") # package no longer on CRAN
 library(rgeoboundaries) # for state/county boundaries
 library(tidycensus) # for FIPS state/county codes
 library(tmap) # to check plots vs ecoregion layers
@@ -97,12 +99,10 @@ plots_county <- st_join(plots_sf, us_county, left = T) |>
   st_drop_geometry()
 
 # Check that plots are showing up in right place
-tmap_options(max.categories = 37) # b/c 37 provinces
-
 tm_shape(ecoprov, bbox = plots_sf) + tm_fill("MAP_UNIT_S") +
  tm_shape(us_county) + tm_borders() +
  tm_shape(us_states) + tm_borders(lwd = 1.5) +
- tm_shape(plots_sf) + tm_dots()
+ tm_shape(plots_sf) + tm_dots(fill = "orange")
 
 # join state and county data to plot locations
 plots_comb <- left_join(plots_state, plots_county, by = c("Plot_Name"))
@@ -357,6 +357,16 @@ tree_sap$jenkins_spgrpcd[tree_sap$scientific_name == "Unknown Conifer"] <- 4
 tree_sap$decaycd[tree_sap$statuscd == "live"] <- 0
 
 length(unique(tree_sap$plt_cn)) #347
+names(tree_sap)
+
+# Drop MABI-023-2012 stand heights that were entered incorrectly as 0 in the database
+nrow(tree_sap |> filter(ht == 0))
+nrow(tree_sap |> filter(!is.na(ht)))
+nrow(tree_sap |> filter(is.na(ht)))
+tree_sap$ht[tree_sap$ht == 0] <- NA_real_
+
+tree_sap$treeclcd[tree_sap$treeclcd == 6] <- 4
+#table(tree_sap$treeclcd)
 
 write.csv(tree_sap, "./data/NETN_tree_sapling_data.csv", row.names = F)
 
