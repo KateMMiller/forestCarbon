@@ -1,8 +1,8 @@
 library(sf)
 library(dplyr)
+library(purrr)
 
 files <- list.files("./data/pre_ecosub_fix")
-files
 
 fix_ecosub <- function(file){
   dat <- read.csv(paste0("./data/pre_ecosub_fix/", file))
@@ -30,4 +30,4 @@ fix_ecosub <- function(file){
 
 }
 
-purrr::map(files, ~fix_ecosub(.x))
+map(files, ~fix_ecosub(.x))
