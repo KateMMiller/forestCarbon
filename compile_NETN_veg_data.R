@@ -143,25 +143,28 @@ head(pest_comb3)
 
 table(pest_comb3$ParkUnit, pest_comb3$SampleYear, pest_comb3$RPS_plot)
 
-#++++ ENDED HERE +++++
-# Need to join the pest and invasive data together.
+
 
 # Check for missing records between the plot info and data
 anti_join(plotev, guilds, by = c("Plot_Name", "SampleYear", "PlotID", "EventID")) # ACAD-060-2019
 anti_join(plotev, stand, by = c("Plot_Name", "SampleYear", "PlotID", "EventID")) # none
+anti_join(plotev, pest_comb3) # none
 
 # join plot and stand and guild data
 intersect(names(plotev), names(stand))
 netn_comb1 <- left_join(plotev, stand, by = c("Plot_Name", "SampleYear", "PlotID", "EventID"))
 netn_comb2 <- left_join(netn_comb1, guilds, by = c("Plot_Name", "SampleYear", "PlotID", "EventID")) |>
   arrange(Plot_Name, SampleYear)
+netn_comb3 <- left_join(netn_comb2, pest_comb3,
+                        by = c("Plot_Name", "ParkUnit", "PlotID", "EventID", "SampleYear"))
 
+head(netn_comb3)
 # set up group columns to convert NA to 0
-cols <- names(guilds)[grepl("_cov|_freq", names(guilds))]
-netn_comb[,cols][is.na(netn_comb[,cols])] <- 0
+cols <- names(netn_comb3)[18:ncol(netn_comb3)]
+netn_comb3[,cols][is.na(netn_comb3[,cols])] <- 0
 
-names(netn_comb)
-
+#++++ ENDED HERE +++++
+# Need to rename the columns more like FIA
 netn_final <- netn_comb |>
   select(plt_cn = Plot_Name, year = SampleYear, lat = Lat, long = Long,
          network = Network, park = ParkUnit, parksubunit = ParkSubUnit,
