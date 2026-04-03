@@ -19,24 +19,24 @@ importCSV(path = "./data", zip_name = "NETN_forest_data_package_20240926.zip")
 
 #---- Download and compile external data -----
 # Download FIA REF_SPECIES.csv to get SPCD
-ref_url <- "https://apps.fs.usda.gov/fia/datamart/CSV/FIADB_REFERENCE.zip"
-download.file(ref_url, "./data/FIADB_REFERENCE.zip")
+# ref_url <- "https://apps.fs.usda.gov/fia/datamart/CSV/FIADB_REFERENCE.zip"
+# download.file(ref_url, "./data/FIADB_REFERENCE.zip")
 refspp <- read.csv(unzip("./data/FIADB_REFERENCE.zip", "REF_SPECIES.csv")) |>
   select(SPCD, SPECIES_SYMBOL, SCIENTIFIC_NAME, GENUS, SPECIES, JENKINS_SPGRPCD)
 #file.remove("REF_SPECIES.csv")
 #write.csv(refspp, "./data/REF_SPECIES.csv", row.names = F)
 
 # Download Ecological Province shapefile
-ecoprov_url <- "https://data.fs.usda.gov/geodata/edw/edw_resources/shp/S_USA.EcoMapProvinces.zip"
-download.file(ecoprov_url, "./data/S_USA.EcoMapProvinces.zip")
-unzip("./data/S_USA.EcoMapProvinces.zip", exdir = "./data")
+# ecoprov_url <- "https://data.fs.usda.gov/geodata/edw/edw_resources/shp/S_USA.EcoMapProvinces.zip"
+# download.file(ecoprov_url, "./data/S_USA.EcoMapProvinces.zip")
+# unzip("./data/S_USA.EcoMapProvinces.zip", exdir = "./data")
 ecoprov <- read_sf("./data/S_USA.EcoMapProvinces.shp") |> st_transform(4326)
 st_crs(ecoprov) #EPSG 4326 WGS84 latlong
 
 # Download Ecological Subsection shapefile
-ecosub_url <- "https://data.fs.usda.gov/geodata/edw/edw_resources/shp/S_USA.EcomapSubsections.zip"
-download.file(ecosub_url, "./data/S_USA.EcomapSubsections.zip")
-unzip("./data/S_USA.EcomapSubsections.zip", exdir = "./data")
+# ecosub_url <- "https://data.fs.usda.gov/geodata/edw/edw_resources/shp/S_USA.EcomapSubsections.zip"
+# download.file(ecosub_url, "./data/S_USA.EcomapSubsections.zip")
+# unzip("./data/S_USA.EcomapSubsections.zip", exdir = "./data")
 ecosub <- read_sf("./data/S_USA.EcomapSubsections.shp") |> st_transform(4326)
 st_crs(ecosub) #EPSG 4326 WGS84 latlong
 
@@ -367,6 +367,14 @@ tree_sap$ht[tree_sap$ht == 0] <- NA_real_
 
 tree_sap$treeclcd[tree_sap$treeclcd == 6] <- 4
 #table(tree_sap$treeclcd)
+
+#---- Fixes found during analysis ----
+table(tree_sap$statuscd, tree_sap$htcd, useNA = 'always')
+tree_sap$htcd[tree_sap$statuscd == "dead"] <- NA_real_
+tree_sap$ht[tree_sap$statuscd == "dead"] <- NA_real_
+
+tree_sap$spcd[tree_sap$usda_symbol == "QUMO4"] <- "832"
+tree_sap$jenkins_spgrpcd[tree_sap$usda_symbol == "QUMO4"] <- 9
 
 write.csv(tree_sap, "./data/NETN_tree_sapling_data.csv", row.names = F)
 

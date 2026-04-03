@@ -383,6 +383,10 @@ tree_sap$ht[tree_sap$ht == 0] <- NA_real_
 # Deleting bad height data in 2009 for APCO-178
 tree_sap$ht[tree_sap$plt_cn == "APCO-178" & tree_sap$year == 2009] <- NA_real_
 
+#---- Fixes caught during analysis ----
+tree_sap$spcd[tree_sap$usda_symbol == "QUMO4"] <- "832"
+tree_sap$jenkins_spgrpcd[tree_sap$usda_symbol == "QUMO4"] <- 9
+
 write.csv(tree_sap, "./data/MIDN_tree_sapling_data.csv", row.names = F)
 
 #---- Metadata for tree and sapling data ----
