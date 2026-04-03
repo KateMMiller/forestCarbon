@@ -3,8 +3,8 @@
 #--------------------------------------------------
 
 library(tidyverse)
-library(forestNETN)
-importCSV(path = "../data/", zip_name = "NETN_Forest_20250926.zip")
+library(forestMIDN)
+importCSV(path = "../data/", zip_name = "MIDN_NCBN_Forest_20250926.zip")
 
 # Plot events table for left join of data
 plotev <- joinLocEvent(output = 'verbose') |>
@@ -84,15 +84,13 @@ disturb <- joinStandDisturbance() |>
 disturb_wide <- disturb |>
   arrange(pest, Plot_Name, SampleYear) |>
   pivot_wider(names_from = pest, values_from = present, values_fill = 0)
-names(tree_pests)
-head(disturb_wide)
 
 # visit notes
-vnotes <- joinVisitNotes() |>
+vnotes <- joinVisitNotes() |> filter(!Note_Type %in% "Tree_Notes") |>
   mutate(pest = case_when(grepl("BBD|beech bark disease", Notes, ignore.case = T) ~ "BBD",
                           grepl("beech leaf disease|BLD", Notes, ignore.case = T) ~ "BLD",
                           grepl("EHS|elongate hemlock scale",
-                          Notes, ignore.case = T) ~ "EHS",
+                                Notes, ignore.case = T) ~ "EHS",
                           grepl("emerald|EAB", Notes, ignore.case = T) ~ "EAB",
                           grepl("GM|spongy|gypsy", Notes) ~ "GM",
                           grepl("HWA|hemlock woolly adelgid| hemlock wooly",
@@ -102,25 +100,28 @@ vnotes <- joinVisitNotes() |>
                           grepl("southern pine beetle|SPB", Notes, ignore.case = T) ~ "SPB",
                           TRUE ~ NA_character_)) |>
   filter(!is.na(pest)) |>
-  filter(!grepl("no sign|didn't see obvious|No definitive|sureabout|no direct evidence|
-                did not see|no distinguisheable|suspicious of EAB|does not look like|
+  filter(!grepl("no sign|No BBD|not BBD|than it does BBD|didn't see obvious|No definitive|
+                BBD code 2 removed|BBD value and foliage conditions|sureabout|no direct evidence|
+                Southern Pine Beetle in area near plot|unsure if due to EAB|possible BBD|
+                did not see|no distinguisheable|suspicious of EAB|does not look like|but not on plot|
                 couldn't find clear evidence of EAB|but do not indicate|did not see sign|
                 didn't see sign|Suspicious of|freshwater|didn't see signs.|not sighted|bushwack|
-                Foliage too high|No obvious signs of|Canopy too high|Raspberry",
+                Foliage too high|No obvious signs of|Canopy too high|Fagus Granifolia|Seabreeze",
                 Notes, ignore.case = T)) |>
   select(Plot_Name, ParkUnit, SampleYear, pest) |> mutate(present = 1) |> unique()
 
-vnotes_wide <- vnotes |> pivot_wider(names_from = pest, values_from = present,
-                                     values_fill = 0, names_glue = "{pest}_note") |>
+vnotes_wide <- vnotes |> arrange(pest) |>
+  pivot_wider(names_from = pest, values_from = present,
+              values_fill = 0, names_glue = "{pest}_note") |>
   summarize(BBD_note = ifelse(sum(BBD_note) > 0, 1, 0),
             BLD_note = ifelse(sum(BLD_note) > 0, 1, 0),
             EAB_note = ifelse(sum(EAB_note) > 0, 1, 0),
-            EHS_note = ifelse(sum(EHS_note) > 0, 1, 0),
-            GM_note = ifelse(sum(GM_note) > 0, 1, 0),
-            HWA_note = ifelse(sum(HWA_note) > 0, 1, 0),
-            RPS_note = ifelse(sum(RPS_note) > 0, 1, 0),
-            SLF_note = 0, #ifelse(sum(SLF_note) > 0, 1, 0),
-            SPB_note = 0, #ifelse(sum(SPB_note) > 0, 1, 0),
+            EHS_note = 0, #ifelse(sum(EHS_note) > 0, 1, 0),
+            GM_note = 0, #ifelse(sum(GM_note) > 0, 1, 0),
+            HWA_note = 0, #ifelse(sum(HWA_note) > 0, 1, 0),
+            RPS_note = 0, #ifelse(sum(RPS_note) > 0, 1, 0),
+            SLF_note = ifelse(sum(SLF_note) > 0, 1, 0),
+            SPB_note = ifelse(sum(SPB_note) > 0, 1, 0),
             .by = c(Plot_Name, ParkUnit, SampleYear))
 
 head(vnotes_wide)
@@ -134,16 +135,16 @@ pest_cols <- names(pest_comb2[,6:ncol(pest_comb2)])
 pest_comb2[,pest_cols][is.na(pest_comb2[,pest_cols])] <- 0
 head(pest_comb2)
 # Create pest_plot column for any instance a pest was detected
-pest_comb3 <- pest_comb2 |> mutate(BBD = ifelse(BBD_trcnt > 0 | BBD > 0 | BBD_note > 0, 1, 0),
-                                   BLD = ifelse(BLD_trcnt > 0 | BLD > 0 | BLD_note > 0, 1, 0),
+pest_comb3 <- pest_comb2 |> mutate(BBD = ifelse(BBD_trcnt > 0 | BBD_note > 0, 1, 0),
+                                   BLD = ifelse(BLD_trcnt > 0 | BLD_note > 0, 1, 0),
                                    EAB = ifelse(EAB_trcnt > 0 | EAB > 0 | EAB_note > 0, 1, 0),
-                                   EHS = ifelse(EHS_trcnt > 0 | EHS > 0 | EHS_note > 0, 1, 0),
-                                   GM = ifelse(GM_trcnt > 0 | GM > 0 | GM_note > 0, 1, 0),
-                                   HWA = ifelse(HWA_trcnt > 0 | HWA > 0 | HWA_note > 0, 1, 0),
-                                   RPS = ifelse((RPS_trcnt > 0 | RPS > 0 | RPS_note > 0) &
+                                   EHS = ifelse(EHS_trcnt > 0 | EHS_note > 0, 1, 0),
+                                   GM = ifelse(GM_trcnt > 0 | GM_note > 0, 1, 0),
+                                   HWA = ifelse(HWA_trcnt > 0 | HWA_note > 0, 1, 0),
+                                   RPS = ifelse((RPS_trcnt > 0 | RPS_note > 0) &
                                                  SampleYear > 2012, 1, 0),
-                                   SLF = ifelse(SLF_trcnt > 0 | SLF_note > 0, 1, 0),
-                                   SPB = ifelse(SPB_trcnt > 0 | SPB_note > 0, 1, 0)) |>
+                                   SLF = ifelse(SLF_trcnt > 0 | SLF > 0 | SLF_note > 0, 1, 0),
+                                   SPB = ifelse(SPB_trcnt > 0 | SPB > 0 | SPB_note > 0, 1, 0)) |>
   select(Plot_Name:SampleYear, VINE_trcnt = VINC_trcnt, BBD, BLD, EAB, EHS, GM, HWA, RPS, SLF, SPB)
 
 head(pest_comb3)
@@ -155,25 +156,23 @@ anti_join(plotev, pest_comb3) # none
 
 # join plot and stand and guild data
 intersect(names(plotev), names(stand))
-netn_comb1 <- left_join(plotev, stand, by = c("Plot_Name", "SampleYear", "PlotID", "EventID"))
-netn_comb2 <- left_join(netn_comb1, guilds, by = c("Plot_Name", "SampleYear", "PlotID", "EventID")) |>
+midn_comb1 <- left_join(plotev, stand, by = c("Plot_Name", "SampleYear", "PlotID", "EventID"))
+midn_comb2 <- left_join(midn_comb1, guilds, by = c("Plot_Name", "SampleYear", "PlotID", "EventID")) |>
   arrange(Plot_Name, SampleYear)
-netn_comb3 <- left_join(netn_comb2, pest_comb3,
+midn_comb3 <- left_join(midn_comb2, pest_comb3,
                         by = c("Plot_Name", "ParkUnit", "PlotID", "EventID", "SampleYear"))
-
-head(netn_comb3)
+names(midn_comb3)
+head(midn_comb3)
 # set up group columns to convert NA to 0
-cols <- names(netn_comb3)[18:ncol(netn_comb3)]
-netn_comb3[,cols][is.na(netn_comb3[,cols])] <- 0
+cols <- names(midn_comb3)[18:ncol(midn_comb3)]
+midn_comb3[,cols][is.na(midn_comb3[,cols])] <- 0
 
 # Need to rename the columns more like FIA
-netn_final <- netn_comb3 |>
+midn_final <- midn_comb3 |>
   select(plt_cn = Plot_Name, year = SampleYear, lat = Lat, long = Long,
          network = Network, park = ParkUnit, parksubunit = ParkSubUnit,
          physio_class = PhysiographySummary, Pct_Crown_Closure:SPB )
 
-head(netn_final)
-write.csv(netn_final, "./data/NETN_veg_and_pest_data.csv", row.names = F)
-
-names(netn_final)
+head(midn_final)
+write.csv(midn_final, "./data/MIDN_veg_and_pest_data.csv", row.names = F)
 
